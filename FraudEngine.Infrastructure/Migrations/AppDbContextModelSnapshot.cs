@@ -28,9 +28,8 @@ namespace FraudEngine.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Decision")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("Decision")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("EvaluatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -51,8 +50,7 @@ namespace FraudEngine.Infrastructure.Migrations
 
                     b.HasIndex("RiskScore");
 
-                    b.HasIndex("TransactionId")
-                        .IsUnique();
+                    b.HasIndex("TransactionId");
 
                     b.ToTable("FraudEvaluations");
                 });
@@ -154,8 +152,8 @@ namespace FraudEngine.Infrastructure.Migrations
             modelBuilder.Entity("FraudEngine.Domain.Entities.FraudEvaluation", b =>
                 {
                     b.HasOne("FraudEngine.Domain.Entities.Transaction", "Transaction")
-                        .WithOne()
-                        .HasForeignKey("FraudEngine.Domain.Entities.FraudEvaluation", "TransactionId")
+                        .WithMany()
+                        .HasForeignKey("TransactionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

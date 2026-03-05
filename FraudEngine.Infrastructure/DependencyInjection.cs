@@ -32,7 +32,7 @@ public static class DependencyInjection
 
         services.AddHealthChecks()
             .AddDbContextCheck<AppDbContext>()
-            .AddRedis(configuration.GetConnectionString("Redis") ?? "127.0.0.1:6379");
+            .AddRedis(configuration.GetConnectionString("Redis"));
 
         return services;
     }

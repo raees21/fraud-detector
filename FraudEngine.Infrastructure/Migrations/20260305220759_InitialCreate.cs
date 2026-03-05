@@ -56,7 +56,7 @@ namespace FraudEngine.Infrastructure.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     TransactionId = table.Column<Guid>(type: "uuid", nullable: false),
                     RiskScore = table.Column<int>(type: "integer", nullable: false),
-                    Decision = table.Column<string>(type: "text", nullable: false),
+                    Decision = table.Column<int>(type: "integer", nullable: false),
                     TriggeredRules = table.Column<string>(type: "jsonb", nullable: false),
                     EvaluatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
@@ -84,8 +84,7 @@ namespace FraudEngine.Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_FraudEvaluations_TransactionId",
                 table: "FraudEvaluations",
-                column: "TransactionId",
-                unique: true);
+                column: "TransactionId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RuleDefinitions_RuleName",
