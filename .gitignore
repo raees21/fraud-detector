@@ -52,3 +52,25 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Environments
+.env
+.env.*
+!.env.example
+!.env.template
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+.history/
+
+# IDEs and Tools
+.idea/
+*.user
+*.suo
+*.sln.docstates
+.DS_Store
