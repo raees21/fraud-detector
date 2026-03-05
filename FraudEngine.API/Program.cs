@@ -4,12 +4,8 @@ using FraudEngine.Infrastructure;
 using FraudEngine.Infrastructure.Data;
 using FraudEngine.Infrastructure.Persistence;
 using Serilog;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using System;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -29,7 +25,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
@@ -46,20 +42,17 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Apply Migrations and Seed Database
-using (var scope = app.Services.CreateScope())
+using (IServiceScope scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try
     {
         Log.Information("Applying Database Migrations...");
         // Ensure the database is created (for local dev/initial creation as requested)
         await context.Database.EnsureCreatedAsync();
-        
+
         // Seed the initial rules if the database exists and we can connect
-        if (await context.Database.CanConnectAsync())
-        {
-            await AppDbContextSeed.SeedAsync(context);
-        }
+        if (await context.Database.CanConnectAsync()) await AppDbContextSeed.SeedAsync(context);
     }
     catch (Exception ex)
     {
@@ -69,4 +62,7 @@ using (var scope = app.Services.CreateScope())
 
 app.Run();
 
+/// <summary>
+/// Partial Program class to expose it to the integration tests project.
+/// </summary>
 public partial class Program { }

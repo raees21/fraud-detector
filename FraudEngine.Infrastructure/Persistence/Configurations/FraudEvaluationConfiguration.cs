@@ -14,9 +14,9 @@ public class FraudEvaluationConfiguration : IEntityTypeConfiguration<FraudEvalua
         builder.Property(e => e.TriggeredRules).HasColumnType("jsonb").IsRequired();
 
         builder.HasOne(e => e.Transaction)
-               .WithOne()
-               .HasForeignKey<FraudEvaluation>(e => e.TransactionId)
-               .OnDelete(DeleteBehavior.Cascade);
+            .WithOne()
+            .HasForeignKey<FraudEvaluation>(e => e.TransactionId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(e => e.Decision);
         builder.HasIndex(e => e.RiskScore);

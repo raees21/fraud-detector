@@ -13,7 +13,7 @@ public class RuleDefinitionConfiguration : IEntityTypeConfiguration<RuleDefiniti
         builder.Property(r => r.RuleName).IsRequired().HasMaxLength(100);
         builder.Property(r => r.Description).HasMaxLength(500);
         builder.Property(r => r.WorkflowJson).HasColumnType("text").IsRequired();
-        
+
         builder.HasIndex(r => r.RuleName).IsUnique();
     }
 }

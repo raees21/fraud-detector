@@ -1,11 +1,8 @@
-using System;
 using System.Net;
 using System.Net.Http.Json;
-using System.Threading.Tasks;
-using FluentAssertions;
+using Xunit;
 using FraudEngine.Application.DTOs;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Xunit;
 
 namespace FraudEngine.IntegrationTests;
 
@@ -22,7 +19,7 @@ public class TransactionScenarios : IClassFixture<WebApplicationFactory<Program>
         {
             builder.ConfigureServices(services =>
             {
-               // Replace DbContext to use an InMemory instance OR Testcontainers
+                // Replace DbContext to use an InMemory instance OR Testcontainers
             });
         });
     }
@@ -33,26 +30,26 @@ public class TransactionScenarios : IClassFixture<WebApplicationFactory<Program>
     public async Task PostTransaction_ReturnsValidEvaluation()
     {
         // Arrange
-        var client = _factory.CreateClient();
+        HttpClient client = _factory.CreateClient();
         var dto = new TransactionDto(
-            AccountId: "USER_123",
-            Amount: 1500,
-            Currency: "USD",
-            MerchantName: "Amazon",
-            MerchantCategory: "RETAIL",
-            IPAddress: "192.168.1.1",
-            DeviceId: "DEV-ABC",
-            AccountAgeDays: 100,
-            Timestamp: DateTimeOffset.UtcNow
+            "USER_123",
+            1500,
+            "USD",
+            "Amazon",
+            "RETAIL",
+            "192.168.1.1",
+            "DEV-ABC",
+            100,
+            DateTimeOffset.UtcNow
         );
 
         // Act
-        var response = await client.PostAsJsonAsync("/api/v1/transactions", dto);
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/transactions", dto);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var result = await response.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
-        result.Should().NotBeNull();
-        result!.Decision.Should().Be("ALLOW");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        FraudEvaluationResultDto? result = await response.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
+        Assert.NotNull(result);
+        Assert.Equal("ALLOW", result!.Decision);
     }
 }

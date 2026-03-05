@@ -1,19 +1,21 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using FraudEngine.Application.DTOs;
 using FraudEngine.Application.Interfaces;
 using FraudEngine.Domain.Common;
 using FraudEngine.Domain.Entities;
+using FraudEngine.Domain.Enums;
 using MediatR;
 
 namespace FraudEngine.Application.Features.Transactions.Commands;
 
-public class EvaluateTransactionCommandHandler : IRequestHandler<EvaluateTransactionCommand, Result<FraudEvaluationResultDto>>
+/// <summary>
+/// Handler for the <see cref="EvaluateTransactionCommand"/>.
+/// </summary>
+public class
+    EvaluateTransactionCommandHandler : IRequestHandler<EvaluateTransactionCommand, Result<FraudEvaluationResultDto>>
 {
-    private readonly ITransactionRepository _transactionRepository;
     private readonly IEvaluationRepository _evaluationRepository;
     private readonly IRulesEngineService _rulesEngineService;
+    private readonly ITransactionRepository _transactionRepository;
 
     public EvaluateTransactionCommandHandler(
         ITransactionRepository transactionRepository,
@@ -25,9 +27,13 @@ public class EvaluateTransactionCommandHandler : IRequestHandler<EvaluateTransac
         _rulesEngineService = rulesEngineService;
     }
 
-    public async Task<Result<FraudEvaluationResultDto>> Handle(EvaluateTransactionCommand request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Handles the command to evaluate a transaction.
+    /// </summary>
+    public async Task<Result<FraudEvaluationResultDto>> Handle(EvaluateTransactionCommand request,
+        CancellationToken cancellationToken)
     {
-        var dto = request.Transaction;
+        TransactionDto dto = request.Transaction;
         var transaction = new Transaction
         {
             AccountId = dto.AccountId,
@@ -43,16 +49,14 @@ public class EvaluateTransactionCommandHandler : IRequestHandler<EvaluateTransac
 
         // Save transaction
         await _transactionRepository.AddAsync(transaction, cancellationToken);
-        
+
         // Evaluate rules
-        var (score, triggeredRules, decision) = await _rulesEngineService.EvaluateAsync(transaction, cancellationToken);
+        (int score, string triggeredRules, Decision decision) =
+            await _rulesEngineService.EvaluateAsync(transaction, cancellationToken);
 
         var evaluation = new FraudEvaluation
         {
-            TransactionId = transaction.Id,
-            RiskScore = score,
-            Decision = decision,
-            TriggeredRules = triggeredRules
+            TransactionId = transaction.Id, RiskScore = score, Decision = decision, TriggeredRules = triggeredRules
         };
 
         // Save evaluation

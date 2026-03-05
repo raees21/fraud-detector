@@ -1,29 +1,32 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using FraudEngine.Application.Interfaces;
 using FraudEngine.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace FraudEngine.Infrastructure.Persistence.Repositories;
 
+/// <summary>
+/// Implementation of <see cref="ITransactionRepository"/> using Entity Framework Core.
+/// </summary>
 public class TransactionRepository : ITransactionRepository
 {
     private readonly AppDbContext _context;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TransactionRepository"/> class.
+    /// </summary>
     public TransactionRepository(AppDbContext context)
     {
         _context = context;
     }
 
+    /// <inheritdoc />
     public async Task AddAsync(Transaction transaction, CancellationToken cancellationToken = default)
     {
         await _context.Transactions.AddAsync(transaction, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
     public async Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.Transactions
@@ -31,10 +34,12 @@ public class TransactionRepository : ITransactionRepository
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
+    /// <inheritdoc />
     public async Task<(IEnumerable<Transaction> Items, int TotalCount)> GetPagedAsync(
-        string? decision, string? accountId, DateTimeOffset? from, DateTimeOffset? to, int page, int pageSize, CancellationToken cancellationToken = default)
+        string? decision, string? accountId, DateTimeOffset? from, DateTimeOffset? to, int page, int pageSize,
+        CancellationToken cancellationToken = default)
     {
-        var query = _context.Transactions
+        IQueryable<Transaction> query = _context.Transactions
             .Include(t => _context.FraudEvaluations.FirstOrDefault(e => e.TransactionId == t.Id))
             .AsNoTracking()
             .AsQueryable();
@@ -49,21 +54,19 @@ public class TransactionRepository : ITransactionRepository
             query = query.Where(t => t.Timestamp <= to.Value);
 
         if (!string.IsNullOrEmpty(decision))
-        {
             // Join with evaluation to filter by decision
             query = query.Join(
-                _context.FraudEvaluations,
-                t => t.Id,
-                e => e.TransactionId,
-                (t, e) => new { Transaction = t, Evaluation = e }
-            )
-            .Where(x => x.Evaluation.Decision.ToString() == decision)
-            .Select(x => x.Transaction);
-        }
+                    _context.FraudEvaluations,
+                    t => t.Id,
+                    e => e.TransactionId,
+                    (t, e) => new { Transaction = t, Evaluation = e }
+                )
+                .Where(x => x.Evaluation.Decision.ToString() == decision)
+                .Select(x => x.Transaction);
 
-        var totalCount = await query.CountAsync(cancellationToken);
-        
-        var items = await query
+        int totalCount = await query.CountAsync(cancellationToken);
+
+        List<Transaction> items = await query
             .OrderByDescending(t => t.Timestamp)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -72,15 +75,17 @@ public class TransactionRepository : ITransactionRepository
         return (items, totalCount);
     }
 
-    public async Task<bool> ExistsRecentDuplicateAsync(string accountId, decimal amount, string merchantName, DateTimeOffset since, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public async Task<bool> ExistsRecentDuplicateAsync(string accountId, decimal amount, string merchantName,
+        DateTimeOffset since, CancellationToken cancellationToken = default)
     {
         return await _context.Transactions
             .AsNoTracking()
-            .AnyAsync(t => 
-                t.AccountId == accountId &&
-                t.Amount == amount &&
-                t.MerchantName == merchantName &&
-                t.Timestamp >= since, 
+            .AnyAsync(t =>
+                    t.AccountId == accountId &&
+                    t.Amount == amount &&
+                    t.MerchantName == merchantName &&
+                    t.Timestamp >= since,
                 cancellationToken);
     }
 }

@@ -1,34 +1,36 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using FraudEngine.Application.Interfaces;
 using StackExchange.Redis;
 
 namespace FraudEngine.Infrastructure.Services;
 
+/// <summary>
+/// Implementation of <see cref="IVelocityService"/> using Redis to track transaction velocity.
+/// </summary>
 public class VelocityService : IVelocityService
 {
     private readonly IConnectionMultiplexer _redis;
     private readonly TimeSpan _window = TimeSpan.FromSeconds(60);
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="VelocityService"/> class.
+    /// </summary>
     public VelocityService(IConnectionMultiplexer redis)
     {
         _redis = redis;
     }
 
-    public async Task<int> GetRecentTransactionCountAsync(string accountId, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public async Task<int> GetRecentTransactionCountAsync(string accountId,
+        CancellationToken cancellationToken = default)
     {
-        var db = _redis.GetDatabase();
-        var key = $"fraud:velocity:{accountId}";
+        IDatabase db = _redis.GetDatabase();
+        string key = $"fraud:velocity:{accountId}";
 
         // INCR the key
-        var count = await db.StringIncrementAsync(key);
+        long count = await db.StringIncrementAsync(key);
 
         // Set expiration only if it's the first increment
-        if (count == 1)
-        {
-            await db.KeyExpireAsync(key, _window);
-        }
+        if (count == 1) await db.KeyExpireAsync(key, _window);
 
         return (int)count;
     }

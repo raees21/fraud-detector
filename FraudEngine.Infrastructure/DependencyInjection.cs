@@ -16,7 +16,7 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
-        var redisConnectionString = configuration.GetConnectionString("Redis");
+        string? redisConnectionString = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrEmpty(redisConnectionString))
         {
             var multiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
@@ -26,7 +26,7 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IEvaluationRepository, EvaluationRepository>();
         services.AddScoped<IRuleRepository, RuleRepository>();
-        
+
         services.AddScoped<IVelocityService, VelocityService>();
         services.AddScoped<IRulesEngineService, RulesEngineService>();
 

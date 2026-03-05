@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using FraudEngine.Application.Interfaces;
 using FraudEngine.Domain.Common;
 using FraudEngine.Domain.Entities;
@@ -9,8 +5,14 @@ using MediatR;
 
 namespace FraudEngine.Application.Features.Rules.Queries
 {
+    /// <summary>
+    /// Query to retrieve all rule definitions.
+    /// </summary>
     public record GetRulesQuery : IRequest<Result<IEnumerable<RuleDefinition>>>;
 
+    /// <summary>
+    /// Handler for the <see cref="GetRulesQuery"/>.
+    /// </summary>
     public class GetRulesQueryHandler : IRequestHandler<GetRulesQuery, Result<IEnumerable<RuleDefinition>>>
     {
         private readonly IRuleRepository _repository;
@@ -20,9 +22,13 @@ namespace FraudEngine.Application.Features.Rules.Queries
             _repository = repository;
         }
 
-        public async Task<Result<IEnumerable<RuleDefinition>>> Handle(GetRulesQuery request, CancellationToken cancellationToken)
+        /// <summary>
+        /// Handles the query to retrieve all rules.
+        /// </summary>
+        public async Task<Result<IEnumerable<RuleDefinition>>> Handle(GetRulesQuery request,
+            CancellationToken cancellationToken)
         {
-            var rules = await _repository.GetAllAsync(cancellationToken);
+            IEnumerable<RuleDefinition> rules = await _repository.GetAllAsync(cancellationToken);
             return Result<IEnumerable<RuleDefinition>>.Success(rules);
         }
     }
@@ -30,8 +36,14 @@ namespace FraudEngine.Application.Features.Rules.Queries
 
 namespace FraudEngine.Application.Features.Rules.Commands
 {
+    /// <summary>
+    /// Command to toggle the active status of a specific rule.
+    /// </summary>
     public record ToggleRuleCommand(Guid Id) : IRequest<Result<bool>>;
 
+    /// <summary>
+    /// Handler for the <see cref="ToggleRuleCommand"/>.
+    /// </summary>
     public class ToggleRuleCommandHandler : IRequestHandler<ToggleRuleCommand, Result<bool>>
     {
         private readonly IRuleRepository _repository;
@@ -43,9 +55,12 @@ namespace FraudEngine.Application.Features.Rules.Commands
             _rulesEngineService = rulesEngineService;
         }
 
+        /// <summary>
+        /// Handles the command to toggle a rule's status.
+        /// </summary>
         public async Task<Result<bool>> Handle(ToggleRuleCommand request, CancellationToken cancellationToken)
         {
-            var rule = await _repository.GetByIdAsync(request.Id, cancellationToken);
+            RuleDefinition? rule = await _repository.GetByIdAsync(request.Id, cancellationToken);
             if (rule == null)
                 return Result<bool>.Failure(new Error("Rule.NotFound", "Rule not found."));
 

@@ -2,6 +2,9 @@ using System;
 
 namespace FraudEngine.Application.DTOs;
 
+/// <summary>
+/// Data transfer object representing an incoming transaction for evaluation.
+/// </summary>
 public record TransactionDto(
     string AccountId,
     decimal Amount,
@@ -14,6 +17,9 @@ public record TransactionDto(
     DateTimeOffset Timestamp
 );
 
+/// <summary>
+/// Data transfer object representing the result of a fraud evaluation.
+/// </summary>
 public record FraudEvaluationResultDto(
     Guid TransactionId,
     int RiskScore,
