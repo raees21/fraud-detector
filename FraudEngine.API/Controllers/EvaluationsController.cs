@@ -4,15 +4,14 @@ using FraudEngine.Domain.Entities;
 using FraudEngine.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace FraudEngine.API.Controllers;
 
 /// <summary>
 /// Controller for querying fraud evaluation historical data.
 /// </summary>
-[ApiController]
-[Route("api/v1/[controller]")]
-public class EvaluationsController : ControllerBase
+public class EvaluationsController : ApiControllerBase
 {
     private readonly IMediator _mediator;
 

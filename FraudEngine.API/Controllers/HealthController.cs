@@ -1,14 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Asp.Versioning;
 
 namespace FraudEngine.API.Controllers;
 
 /// <summary>
 /// Controller for exposing system health check statuses.
 /// </summary>
-[ApiController]
-[Route("api/v1/[controller]")]
-public class HealthController : ControllerBase
+public class HealthController : ApiControllerBase
 {
     private readonly HealthCheckService _healthCheckService;
 

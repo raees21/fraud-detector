@@ -5,15 +5,14 @@ using FraudEngine.Domain.Common;
 using FraudEngine.Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace FraudEngine.API.Controllers;
 
 /// <summary>
 /// Controller for managing and evaluating transactions.
 /// </summary>
-[ApiController]
-[Route("api/v1/[controller]")]
-public class TransactionsController : ControllerBase
+public class TransactionsController : ApiControllerBase
 {
     private readonly IMediator _mediator;
 

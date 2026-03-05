@@ -4,15 +4,14 @@ using FraudEngine.Domain.Common;
 using FraudEngine.Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace FraudEngine.API.Controllers;
 
 /// <summary>
 /// Controller for managing fraud detection rules.
 /// </summary>
-[ApiController]
-[Route("api/v1/[controller]")]
-public class RulesController : ControllerBase
+public class RulesController : ApiControllerBase
 {
     private readonly IMediator _mediator;
 
