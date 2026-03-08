@@ -13,6 +13,34 @@ The project is built with ASP.NET Core, PostgreSQL, Redis, MediatR, and [Microso
 - Protects partner-facing endpoints with API key authentication.
 - Applies rate limiting per authenticated client.
 
+## Seeded Fraud Rules
+
+On startup, the application seeds or refreshes the default fraud rules stored in PostgreSQL.
+
+Current decision thresholds:
+
+- `ALLOW` for total score under `40`
+- `REVIEW` for total score from `40` to `69`
+- `BLOCK` for total score `70` or higher
+
+Current seeded rules:
+
+| Rule | Condition | Score |
+| --- | --- | --- |
+| `HIGH_AMOUNT_RULE` | `amount > 10000` | `35` |
+| `VELOCITY_RULE` | more than `3` transactions for the same `accountId` within `60` seconds | `40` |
+| `SUSPICIOUS_HOUR_RULE` | current UTC hour is between `01:00` and `04:59` | `15` |
+| `HIGH_RISK_MERCHANT_RULE` | `merchantCategory` is `GAMBLING`, `CRYPTO`, or `ADULT` | `25` |
+| `NEW_ACCOUNT_RULE` | `accountAgeDays < 7` | `20` |
+| `DUPLICATE_TRANSACTION_RULE` | same `accountId`, `amount`, and `merchantName` seen within the last `5` minutes | `35` |
+| `FOREIGN_CURRENCY_HIGH_AMOUNT_RULE` | `currency != "ZAR"` and `amount > 5000` | `20` |
+
+Notes:
+
+- velocity is tracked in Redis per `accountId`
+- duplicate detection is checked against stored transactions in PostgreSQL
+- suspicious hour is based on the server's current UTC time at evaluation, not the submitted transaction timestamp
+
 ## Quick Start
 
 ### Prerequisites
@@ -344,34 +372,6 @@ Current local defaults:
 - transaction submissions: token bucket with burst `1000`, refill `100` requests per second
 
 If the limit is exceeded, the API returns `429 Too Many Requests`.
-
-## Seeded Fraud Rules
-
-On startup, the application seeds or refreshes the default fraud rules stored in PostgreSQL.
-
-Current decision thresholds:
-
-- `ALLOW` for total score under `40`
-- `REVIEW` for total score from `40` to `69`
-- `BLOCK` for total score `70` or higher
-
-Current seeded rules:
-
-| Rule | Condition | Score |
-| --- | --- | --- |
-| `HIGH_AMOUNT_RULE` | `amount > 10000` | `35` |
-| `VELOCITY_RULE` | more than `3` transactions for the same `accountId` within `60` seconds | `40` |
-| `SUSPICIOUS_HOUR_RULE` | current UTC hour is between `01:00` and `04:59` | `15` |
-| `HIGH_RISK_MERCHANT_RULE` | `merchantCategory` is `GAMBLING`, `CRYPTO`, or `ADULT` | `25` |
-| `NEW_ACCOUNT_RULE` | `accountAgeDays < 7` | `20` |
-| `DUPLICATE_TRANSACTION_RULE` | same `accountId`, `amount`, and `merchantName` seen within the last `5` minutes | `35` |
-| `FOREIGN_CURRENCY_HIGH_AMOUNT_RULE` | `currency != "ZAR"` and `amount > 5000` | `20` |
-
-Notes:
-
-- velocity is tracked in Redis per `accountId`
-- duplicate detection is checked against stored transactions in PostgreSQL
-- suspicious hour is based on the server's current UTC time at evaluation, not the submitted transaction timestamp
 
 ## Project Structure
 
