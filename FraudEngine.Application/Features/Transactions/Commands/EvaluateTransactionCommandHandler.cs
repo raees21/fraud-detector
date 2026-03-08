@@ -41,6 +41,7 @@ public class
             Currency = dto.Currency,
             MerchantName = dto.MerchantName,
             MerchantCategory = dto.MerchantCategory,
+            TransactionType = dto.TransactionType,
             IPAddress = dto.IPAddress.Trim(),
             DeviceId = dto.DeviceId.Trim(),
             AccountAgeDays = dto.AccountAgeDays,

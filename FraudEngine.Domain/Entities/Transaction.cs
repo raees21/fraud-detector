@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using FraudEngine.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace FraudEngine.Domain.Entities;
@@ -50,6 +51,11 @@ public class Transaction
     [Required]
     [MaxLength(50)]
     public string MerchantCategory { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the type of transaction being evaluated.
+    /// </summary>
+    public TransactionType TransactionType { get; set; } = TransactionType.UNKNOWN;
 
     /// <summary>
     /// Gets or sets the IP address from which the transaction was initiated.

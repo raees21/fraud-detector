@@ -51,4 +51,17 @@ internal sealed class EvaluationRepository : IEvaluationRepository
 
         return (items, totalCount);
     }
+
+    /// <inheritdoc />
+    public async Task<int> CountRecentBlockedAttemptsAsync(string accountId, DateTimeOffset since,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.FraudEvaluations
+            .AsNoTracking()
+            .Where(evaluation =>
+                evaluation.Decision == Decision.BLOCK &&
+                evaluation.EvaluatedAt >= since &&
+                evaluation.Transaction.AccountId == accountId)
+            .CountAsync(cancellationToken);
+    }
 }

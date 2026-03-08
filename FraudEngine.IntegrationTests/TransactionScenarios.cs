@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FraudEngine.Application.DTOs;
+using FraudEngine.Domain.Enums;
 
 namespace FraudEngine.IntegrationTests;
 
@@ -44,16 +45,19 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
     {
         using HttpClient client = CreateAuthenticatedClient();
         string accountId = $"ACC-{Guid.NewGuid():N}";
-        var transaction = new TransactionDto(
+        var transaction = new
+        {
             accountId,
-            149.99m,
-            "ZAR",
-            "Contoso",
-            "RETAIL",
-            "203.0.113.10",
-            "DEVICE-001",
-            365,
-            DateTimeOffset.UtcNow);
+            amount = 149.99m,
+            currency = "ZAR",
+            merchantName = "Contoso",
+            merchantCategory = "RETAIL",
+            transactionType = "EFT",
+            ipAddress = "203.0.113.10",
+            deviceId = "DEVICE-001",
+            accountAgeDays = 365,
+            timestamp = DateTimeOffset.UtcNow
+        };
 
         HttpResponseMessage submitResponse = await client.PostAsJsonAsync("/api/v1/transactions", transaction);
 
@@ -74,6 +78,7 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
         JsonElement[] transactions = historyPayload.GetProperty("data").EnumerateArray().ToArray();
         JsonElement matchingTransaction = Assert.Single(transactions);
         Assert.Equal(evaluation.TransactionId, matchingTransaction.GetProperty("transactionId").GetGuid());
+        Assert.Equal("EFT", matchingTransaction.GetProperty("transactionType").GetString());
     }
 
     [Fact]
@@ -86,6 +91,7 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             "US",
             "Contoso",
             "RETAIL",
+            TransactionType.CARD,
             "203.0.113.10",
             "DEVICE-001",
             365,
@@ -110,6 +116,7 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             currency = "ZAR",
             merchantName = "Contoso",
             merchantCategory = "RETAIL",
+            transactionType = "CARD",
             ipAddress = string.Empty,
             deviceId = string.Empty,
             accountAgeDays = 365,
@@ -135,6 +142,7 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             "ZAR",
             "Contoso",
             "RETAIL",
+            TransactionType.CARD,
             "203.0.113.10",
             "DEVICE-001",
             365,
@@ -168,6 +176,7 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             "ZAR",
             "Contoso",
             "RETAIL",
+            TransactionType.CARD,
             "203.0.113.10",
             "DEVICE-001",
             365,
@@ -178,6 +187,7 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             "ZAR",
             "Contoso",
             "RETAIL",
+            TransactionType.CARD,
             "198.51.100.10",
             "DEVICE-002",
             365,
@@ -194,6 +204,56 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
 
         Assert.NotNull(secondEvaluation);
         Assert.Equal("REVIEW", secondEvaluation!.Decision);
+    }
+
+    [Fact]
+    public async Task PostTransaction_WhenThreeRecentBlockedAttemptsExist_ReturnsBlock()
+    {
+        using HttpClient client = CreateAuthenticatedClient();
+        string accountId = $"ACC-{Guid.NewGuid():N}";
+
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            var blockedAttempt = new TransactionDto(
+                accountId,
+                12000m + attempt,
+                "USD",
+                $"Contoso-{attempt}",
+                "RETAIL",
+                TransactionType.CARD,
+                "203.0.113.10",
+                $"DEVICE-BLOCK-{attempt}",
+                1,
+                DateTimeOffset.UtcNow.AddMinutes(-(attempt + 1)));
+
+            HttpResponseMessage blockedResponse =
+                await client.PostAsJsonAsync("/api/v1/transactions", blockedAttempt);
+            FraudEvaluationResultDto? blockedEvaluation =
+                await blockedResponse.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
+
+            Assert.Equal(HttpStatusCode.OK, blockedResponse.StatusCode);
+            Assert.NotNull(blockedEvaluation);
+            Assert.Equal("BLOCK", blockedEvaluation!.Decision);
+        }
+
+        var followUpTransaction = new TransactionDto(
+            accountId,
+            150m,
+            "ZAR",
+            "Contoso",
+            "RETAIL",
+            TransactionType.CARD,
+            "203.0.113.10",
+            "DEVICE-FOLLOWUP",
+            365,
+            DateTimeOffset.UtcNow);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/transactions", followUpTransaction);
+        FraudEvaluationResultDto? evaluation = await response.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(evaluation);
+        Assert.Equal("BLOCK", evaluation!.Decision);
     }
 
     [Fact]

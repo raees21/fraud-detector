@@ -1,4 +1,5 @@
 using System;
+using FraudEngine.Domain.Enums;
 
 namespace FraudEngine.Application.DTOs;
 
@@ -11,6 +12,7 @@ public record TransactionDto(
     string Currency,
     string MerchantName,
     string MerchantCategory,
+    TransactionType TransactionType,
     string IPAddress,
     string DeviceId,
     int AccountAgeDays,
@@ -36,6 +38,7 @@ public record TransactionSummaryDto(
     string Currency,
     string MerchantName,
     string MerchantCategory,
+    TransactionType TransactionType,
     DateTimeOffset Timestamp,
     DateTimeOffset CreatedAt
 );

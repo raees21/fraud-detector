@@ -3,6 +3,7 @@ using FraudEngine.Application.Features.Evaluations.Queries;
 using FraudEngine.Application.Features.Transactions.Commands;
 using FraudEngine.Application.Features.Transactions.Queries;
 using FraudEngine.Application.Validation;
+using FraudEngine.Domain.Enums;
 
 namespace FraudEngine.UnitTests;
 
@@ -18,6 +19,7 @@ public class SecurityValidationTests
             "USD",
             "Example Merchant",
             "RETAIL",
+            TransactionType.CARD,
             "not-an-ip",
             "DEVICE-1",
             365,
@@ -39,6 +41,7 @@ public class SecurityValidationTests
             "USD",
             "Example Merchant",
             "RETAIL",
+            TransactionType.CARD,
             string.Empty,
             string.Empty,
             365,
@@ -49,6 +52,28 @@ public class SecurityValidationTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.PropertyName.EndsWith("IPAddress"));
         Assert.Contains(result.Errors, error => error.PropertyName.EndsWith("DeviceId"));
+    }
+
+    [Fact]
+    public void EvaluateTransactionCommand_UnknownTransactionType_IsRejected()
+    {
+        var validator = new EvaluateTransactionCommandValidator();
+        var command = new EvaluateTransactionCommand(new TransactionDto(
+            "ACC-10001",
+            25.50m,
+            "USD",
+            "Example Merchant",
+            "RETAIL",
+            TransactionType.UNKNOWN,
+            "203.0.113.10",
+            "DEVICE-1",
+            365,
+            DateTimeOffset.UtcNow));
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName.EndsWith("TransactionType"));
     }
 
     [Fact]

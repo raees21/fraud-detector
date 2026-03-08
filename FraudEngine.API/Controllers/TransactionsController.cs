@@ -108,6 +108,7 @@ public class TransactionsController : ApiControllerBase
             transaction.Currency,
             transaction.MerchantName,
             transaction.MerchantCategory,
+            transaction.TransactionType,
             transaction.Timestamp,
             transaction.CreatedAt
         );

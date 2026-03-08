@@ -32,7 +32,13 @@ Current seeded rules:
 | `SUSPICIOUS_HOUR_RULE` | current UTC hour is between `01:00` and `04:59` | `15` |
 | `HIGH_RISK_MERCHANT_RULE` | `merchantCategory` is `GAMBLING`, `CRYPTO`, or `ADULT` | `25` |
 | `NEW_ACCOUNT_RULE` | `accountAgeDays < 7` | `20` |
+| `TRANSACTION_TYPE_EFT_RULE` | `transactionType == EFT` | `10` |
+| `TRANSACTION_TYPE_CARD_RULE` | `transactionType == CARD` | `15` |
+| `TRANSACTION_TYPE_AUTOMATED_RECURRING_RULE` | `transactionType == AUTOMATED_OR_RECURRING` | `5` |
+| `TRANSACTION_TYPE_MOBILE_RULE` | `transactionType == MOBILE` | `15` |
+| `TRANSACTION_TYPE_EWALLET_RULE` | `transactionType == EWALLET` | `20` |
 | `DUPLICATE_TRANSACTION_RULE` | same `accountId`, `amount`, and `merchantName` seen within the last `5` minutes | `35` |
+| `REPEATED_DECLINED_TRANSACTION_RULE` | `3` or more blocked transactions for the same `accountId` within `30` minutes | `70` |
 | `RECENT_LOCATION_CHANGE_RULE` | same `accountId` has recent activity from a different mapped country within `24` hours | `40` |
 | `FOREIGN_CURRENCY_HIGH_AMOUNT_RULE` | `currency != "ZAR"` and `amount > 5000` | `20` |
 
@@ -153,12 +159,21 @@ Example request body:
   "currency": "ZAR",
   "merchantName": "Contoso",
   "merchantCategory": "RETAIL",
+  "transactionType": "CARD",
   "ipAddress": "203.0.113.10",
   "deviceId": "DEVICE-001",
   "accountAgeDays": 365,
   "timestamp": "2026-03-08T12:00:00Z"
 }
 ```
+
+Supported `transactionType` values:
+
+- `EFT`
+- `CARD`
+- `AUTOMATED_OR_RECURRING`
+- `MOBILE`
+- `EWALLET`
 
 Example response:
 
@@ -209,9 +224,10 @@ Example response:
       "transactionId": "2f5de68a-879d-4268-ab30-cba1a7a4a353",
       "maskedAccountId": "*****0001",
       "amount": 149.99,
-      "currency": "USD",
+      "currency": "ZAR",
       "merchantName": "Contoso",
       "merchantCategory": "RETAIL",
+      "transactionType": "CARD",
       "timestamp": "2026-03-08T12:00:00+00:00",
       "createdAt": "2026-03-08T12:00:00.1000000+00:00"
     }

@@ -10,6 +10,7 @@ namespace FraudEngine.UnitTests;
 
 public class EvaluationTests
 {
+    private readonly Mock<IEvaluationRepository> _evaluationRepoMock;
     private readonly Mock<IIpLocationService> _ipLocationServiceMock;
     private readonly Mock<IRuleRepository> _ruleRepoMock;
     private readonly RulesEngineService _sut;
@@ -18,12 +19,14 @@ public class EvaluationTests
 
     public EvaluationTests()
     {
+        _evaluationRepoMock = new Mock<IEvaluationRepository>();
         _ruleRepoMock = new Mock<IRuleRepository>();
         _txRepoMock = new Mock<ITransactionRepository>();
         _velocitySvcMock = new Mock<IVelocityService>();
         _ipLocationServiceMock = new Mock<IIpLocationService>();
 
         _sut = new RulesEngineService(
+            _evaluationRepoMock.Object,
             _ruleRepoMock.Object,
             _txRepoMock.Object,
             _velocitySvcMock.Object,
@@ -31,6 +34,11 @@ public class EvaluationTests
             new NullLogger<RulesEngineService>()
         );
 
+        _evaluationRepoMock.Setup(x => x.CountRecentBlockedAttemptsAsync(
+                It.IsAny<string>(),
+                It.IsAny<DateTimeOffset>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
         _ipLocationServiceMock.Setup(x => x.ResolveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new IpLocationResult("ZA", "South Africa", true));
         _txRepoMock.Setup(x => x.GetRecentByAccountAsync(
@@ -175,5 +183,71 @@ public class EvaluationTests
         Assert.Equal(40, score);
         Assert.Equal(Decision.REVIEW, decision);
         Assert.Contains("RECENT_LOCATION_CHANGE_RULE", rulesJson);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_RepeatedDeclinedTransactions_TriggersBlock()
+    {
+        SetupMockRules(CreateRule("REPEATED_DECLINED_TRANSACTION_RULE", 70,
+            "input2.RecentBlockedAttemptCount >= 3"));
+        var tx = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            AccountId = "ACC-123",
+            IPAddress = "203.0.113.10"
+        };
+
+        _velocitySvcMock.Setup(x => x.GetRecentTransactionCountAsync("ACC-123", default))
+            .ReturnsAsync(1);
+        _evaluationRepoMock.Setup(x => x.CountRecentBlockedAttemptsAsync(
+                "ACC-123",
+                It.IsAny<DateTimeOffset>(),
+                default))
+            .ReturnsAsync(3);
+        _txRepoMock.Setup(x => x.ExistsRecentDuplicateAsync(
+                "ACC-123",
+                It.IsAny<decimal>(),
+                It.IsAny<string>(),
+                It.IsAny<DateTimeOffset>(),
+                tx.Id,
+                default))
+            .ReturnsAsync(false);
+
+        (int score, string rulesJson, Decision decision) = await _sut.EvaluateAsync(tx);
+
+        Assert.Equal(70, score);
+        Assert.Equal(Decision.BLOCK, decision);
+        Assert.Contains("REPEATED_DECLINED_TRANSACTION_RULE", rulesJson);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_TransactionTypeCard_TriggersRiskRule()
+    {
+        SetupMockRules(CreateRule("TRANSACTION_TYPE_CARD_RULE", 15,
+            "input1.TransactionType == TransactionType.CARD"));
+        var tx = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            AccountId = "ACC-123",
+            IPAddress = "203.0.113.10",
+            TransactionType = TransactionType.CARD
+        };
+
+        _velocitySvcMock.Setup(x => x.GetRecentTransactionCountAsync("ACC-123", default))
+            .ReturnsAsync(1);
+        _txRepoMock.Setup(x => x.ExistsRecentDuplicateAsync(
+                "ACC-123",
+                It.IsAny<decimal>(),
+                It.IsAny<string>(),
+                It.IsAny<DateTimeOffset>(),
+                tx.Id,
+                default))
+            .ReturnsAsync(false);
+
+        (int score, string rulesJson, Decision decision) = await _sut.EvaluateAsync(tx);
+
+        Assert.Equal(15, score);
+        Assert.Equal(Decision.ALLOW, decision);
+        Assert.Contains("TRANSACTION_TYPE_CARD_RULE", rulesJson);
     }
 }

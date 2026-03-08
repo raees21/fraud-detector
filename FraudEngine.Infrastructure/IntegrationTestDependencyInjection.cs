@@ -241,6 +241,24 @@ public static class IntegrationTestDependencyInjection
                 return Task.FromResult((pageItems, totalCount));
             }
         }
+
+        public Task<int> CountRecentBlockedAttemptsAsync(string accountId, DateTimeOffset since,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_store.SyncRoot)
+            {
+                int count = _store.Evaluations.Count(evaluation =>
+                {
+                    if (evaluation.Decision != Decision.BLOCK || evaluation.EvaluatedAt < since)
+                        return false;
+
+                    Transaction? transaction = _store.Transactions.FirstOrDefault(item => item.Id == evaluation.TransactionId);
+                    return transaction?.AccountId == accountId;
+                });
+
+                return Task.FromResult(count);
+            }
+        }
     }
 
     private sealed class InMemoryRuleRepository : IRuleRepository

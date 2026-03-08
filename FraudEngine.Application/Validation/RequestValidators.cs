@@ -36,6 +36,10 @@ internal sealed class EvaluateTransactionCommandValidator : AbstractValidator<Ev
             .NotEmpty()
             .MaximumLength(50);
 
+        RuleFor(command => command.Transaction.TransactionType)
+            .NotEqual(TransactionType.UNKNOWN)
+            .WithMessage("TransactionType must be one of EFT, CARD, AUTOMATED_OR_RECURRING, MOBILE, or EWALLET.");
+
         RuleFor(command => command.Transaction.IPAddress)
             .NotEmpty()
             .WithMessage("IPAddress is required.")

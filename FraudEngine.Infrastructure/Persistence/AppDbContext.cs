@@ -16,5 +16,10 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Transaction>()
+            .Property(transaction => transaction.TransactionType)
+            .HasConversion<string>()
+            .HasMaxLength(32);
     }
 }

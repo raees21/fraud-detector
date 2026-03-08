@@ -20,6 +20,7 @@ X-Api-Key: {{ApiKey}}
   "currency": "ZAR",
   "merchantName": "Contoso",
   "merchantCategory": "RETAIL",
+  "transactionType": "CARD",
   "ipAddress": "203.0.113.10",
   "deviceId": "DEVICE-001",
   "accountAgeDays": 365,

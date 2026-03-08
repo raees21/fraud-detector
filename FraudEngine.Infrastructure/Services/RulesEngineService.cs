@@ -13,6 +13,7 @@ namespace FraudEngine.Infrastructure.Services;
 internal sealed class RulesEngineService : IRulesEngineService
 {
     private static readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly IEvaluationRepository _evaluationRepository;
     private readonly IIpLocationService _ipLocationService;
     private readonly ILogger<RulesEngineService> _logger;
     private readonly IRuleRepository _ruleRepository;
@@ -26,12 +27,14 @@ internal sealed class RulesEngineService : IRulesEngineService
     /// Initializes a new instance of the <see cref="RulesEngineService"/> class.
     /// </summary>
     public RulesEngineService(
+        IEvaluationRepository evaluationRepository,
         IRuleRepository ruleRepository,
         ITransactionRepository transactionRepository,
         IVelocityService velocityService,
         IIpLocationService ipLocationService,
         ILogger<RulesEngineService> logger)
     {
+        _evaluationRepository = evaluationRepository;
         _ruleRepository = ruleRepository;
         _transactionRepository = transactionRepository;
         _velocityService = velocityService;
@@ -68,7 +71,7 @@ internal sealed class RulesEngineService : IRulesEngineService
 
             var reSettings = new ReSettings
             {
-                CustomTypes = new[] { typeof(DateTimeOffset), typeof(TimeSpan), typeof(string) }
+                CustomTypes = new[] { typeof(DateTimeOffset), typeof(TimeSpan), typeof(string), typeof(TransactionType) }
             };
 
             _rulesEngine = new RulesEngine.RulesEngine(workflows.ToArray(), reSettings);
@@ -96,6 +99,10 @@ internal sealed class RulesEngineService : IRulesEngineService
             DateTimeOffset.UtcNow.AddMinutes(-5),
             transaction.Id,
             cancellationToken);
+        int recentBlockedAttemptCount = await _evaluationRepository.CountRecentBlockedAttemptsAsync(
+            transaction.AccountId,
+            DateTimeOffset.UtcNow.AddMinutes(-30),
+            cancellationToken);
         (bool hasRecentLocationChange, string currentCountryCode, string previousCountryCode) =
             await EvaluateRecentLocationChangeAsync(transaction, cancellationToken);
 
@@ -107,6 +114,7 @@ internal sealed class RulesEngineService : IRulesEngineService
             {
                 VelocityCount = velocityCount,
                 IsDuplicate = isDuplicate,
+                RecentBlockedAttemptCount = recentBlockedAttemptCount,
                 CurrentHourUtc = DateTimeOffset.UtcNow.Hour,
                 CurrentCountryCode = currentCountryCode,
                 PreviousCountryCode = previousCountryCode,
