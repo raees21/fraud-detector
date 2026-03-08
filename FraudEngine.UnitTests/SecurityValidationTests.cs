@@ -30,7 +30,7 @@ public class SecurityValidationTests
     }
 
     [Fact]
-    public void EvaluateTransactionCommand_MissingIpAddressAndDeviceId_IsAccepted()
+    public void EvaluateTransactionCommand_MissingIpAddressAndDeviceId_IsRejected()
     {
         var validator = new EvaluateTransactionCommandValidator();
         var command = new EvaluateTransactionCommand(new TransactionDto(
@@ -39,14 +39,16 @@ public class SecurityValidationTests
             "USD",
             "Example Merchant",
             "RETAIL",
-            null,
-            null,
+            string.Empty,
+            string.Empty,
             365,
             DateTimeOffset.UtcNow));
 
         var result = validator.Validate(command);
 
-        Assert.True(result.IsValid);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName.EndsWith("IPAddress"));
+        Assert.Contains(result.Errors, error => error.PropertyName.EndsWith("DeviceId"));
     }
 
     [Fact]

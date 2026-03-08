@@ -11,8 +11,8 @@ public record TransactionDto(
     string Currency,
     string MerchantName,
     string MerchantCategory,
-    string? IPAddress,
-    string? DeviceId,
+    string IPAddress,
+    string DeviceId,
     int AccountAgeDays,
     DateTimeOffset Timestamp
 );

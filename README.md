@@ -33,13 +33,21 @@ Current seeded rules:
 | `HIGH_RISK_MERCHANT_RULE` | `merchantCategory` is `GAMBLING`, `CRYPTO`, or `ADULT` | `25` |
 | `NEW_ACCOUNT_RULE` | `accountAgeDays < 7` | `20` |
 | `DUPLICATE_TRANSACTION_RULE` | same `accountId`, `amount`, and `merchantName` seen within the last `5` minutes | `35` |
+| `RECENT_LOCATION_CHANGE_RULE` | same `accountId` has recent activity from a different mapped country within `24` hours | `40` |
 | `FOREIGN_CURRENCY_HIGH_AMOUNT_RULE` | `currency != "ZAR"` and `amount > 5000` | `20` |
 
 Notes:
 
 - velocity is tracked in Redis per `accountId`
 - duplicate detection is checked against stored transactions in PostgreSQL
+- the location-change rule uses configured IP-to-country mappings, not a live third-party lookup
 - suspicious hour is based on the server's current UTC time at evaluation, not the submitted transaction timestamp
+
+Local demo IP mappings:
+
+- `203.0.113.0/24` maps to `ZA` (South Africa)
+- `198.51.100.0/24` maps to `US` (United States)
+- `192.0.2.0/24` maps to `GB` (United Kingdom)
 
 ## Quick Start
 
@@ -142,9 +150,11 @@ Example request body:
 {
   "accountId": "ACC-10001",
   "amount": 149.99,
-  "currency": "USD",
+  "currency": "ZAR",
   "merchantName": "Contoso",
   "merchantCategory": "RETAIL",
+  "ipAddress": "203.0.113.10",
+  "deviceId": "DEVICE-001",
   "accountAgeDays": 365,
   "timestamp": "2026-03-08T12:00:00Z"
 }
@@ -314,9 +324,11 @@ curl -X POST http://localhost:5050/api/v1/transactions \
   -d '{
     "accountId": "ACC-10001",
     "amount": 149.99,
-    "currency": "USD",
+    "currency": "ZAR",
     "merchantName": "Contoso",
     "merchantCategory": "RETAIL",
+    "ipAddress": "203.0.113.10",
+    "deviceId": "DEVICE-001",
     "accountAgeDays": 365,
     "timestamp": "2026-03-08T12:00:00Z"
   }'
@@ -353,8 +365,8 @@ This returns the first page with 20 results by default.
 The API rejects malformed requests before evaluation. Examples:
 
 - `currency` must be a 3-letter uppercase ISO code such as `USD`
-- `ipAddress` is optional, but if provided it must be a valid IPv4 or IPv6 address
-- `deviceId` is optional
+- `ipAddress` is required and must be a valid IPv4 or IPv6 address
+- `deviceId` is required
 - `amount` must be greater than `0`
 - `page` must be greater than `0`
 - `pageSize` must be between `1` and `100`

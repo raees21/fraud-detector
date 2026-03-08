@@ -45,8 +45,20 @@ public interface ITransactionRepository
     /// <param name="amount">The transaction amount.</param>
     /// <param name="merchantName">The merchant name.</param>
     /// <param name="since">The threshold time to check since.</param>
+    /// <param name="excludeTransactionId">Optional transaction ID to exclude from the search.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if a duplicate is found, otherwise false.</returns>
     public Task<bool> ExistsRecentDuplicateAsync(string accountId, decimal amount, string merchantName,
-        DateTimeOffset since, CancellationToken cancellationToken = default);
+        DateTimeOffset since, Guid? excludeTransactionId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves recent transactions for a specific account.
+    /// </summary>
+    /// <param name="accountId">The account identifier.</param>
+    /// <param name="since">The lower bound for recent history.</param>
+    /// <param name="excludeTransactionId">Optional transaction ID to exclude from the results.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The recent transactions for the account.</returns>
+    public Task<IEnumerable<Transaction>> GetRecentByAccountAsync(string accountId, DateTimeOffset since,
+        Guid? excludeTransactionId = null, CancellationToken cancellationToken = default);
 }

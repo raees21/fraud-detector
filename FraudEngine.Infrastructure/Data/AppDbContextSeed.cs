@@ -62,6 +62,8 @@ public static class AppDbContextSeed
                 "input1.AccountAgeDays < 7"),
             CreateRule("DUPLICATE_TRANSACTION_RULE", "Possible duplicate transaction", 35,
                 "input2.IsDuplicate == true"),
+            CreateRule("RECENT_LOCATION_CHANGE_RULE", "Recent account activity from a different country", 40,
+                "input2.HasRecentLocationChange == true"),
             CreateRule("FOREIGN_CURRENCY_HIGH_AMOUNT_RULE", "High-value foreign currency transaction", 20,
                 "input1.Currency != \"ZAR\" AND input1.Amount > 5000")
         };

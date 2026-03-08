@@ -17,9 +17,11 @@ X-Api-Key: {{ApiKey}}
 {
   "accountId": "ACC-10001",
   "amount": 149.99,
-  "currency": "USD",
+  "currency": "ZAR",
   "merchantName": "Contoso",
   "merchantCategory": "RETAIL",
+  "ipAddress": "203.0.113.10",
+  "deviceId": "DEVICE-001",
   "accountAgeDays": 365,
   "timestamp": "2026-03-08T12:00:00Z"
 }

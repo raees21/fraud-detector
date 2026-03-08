@@ -79,15 +79,30 @@ internal sealed class TransactionRepository : ITransactionRepository
 
     /// <inheritdoc />
     public async Task<bool> ExistsRecentDuplicateAsync(string accountId, decimal amount, string merchantName,
-        DateTimeOffset since, CancellationToken cancellationToken = default)
+        DateTimeOffset since, Guid? excludeTransactionId = null, CancellationToken cancellationToken = default)
     {
         return await _context.Transactions
             .AsNoTracking()
             .AnyAsync(t =>
+                    (!excludeTransactionId.HasValue || t.Id != excludeTransactionId.Value) &&
                     t.AccountId == accountId &&
                     t.Amount == amount &&
                     t.MerchantName == merchantName &&
                     t.Timestamp >= since,
                 cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<Transaction>> GetRecentByAccountAsync(string accountId, DateTimeOffset since,
+        Guid? excludeTransactionId = null, CancellationToken cancellationToken = default)
+    {
+        return await _context.Transactions
+            .AsNoTracking()
+            .Where(t =>
+                (!excludeTransactionId.HasValue || t.Id != excludeTransactionId.Value) &&
+                t.AccountId == accountId &&
+                t.Timestamp >= since)
+            .OrderByDescending(t => t.Timestamp)
+            .ToListAsync(cancellationToken);
     }
 }

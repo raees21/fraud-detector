@@ -13,10 +13,57 @@ public static class IntegrationTestDependencyInjection
     public static IServiceCollection AddIntegrationTestInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<InMemoryFraudStore>();
+        services.AddOptions<ConfiguredIpLocationService.IpLocationOptions>()
+            .Configure(options =>
+            {
+                options.Mappings =
+                [
+                    new ConfiguredIpLocationService.IpLocationMappingOptions
+                    {
+                        Cidr = "203.0.113.0/24",
+                        CountryCode = "ZA",
+                        CountryName = "South Africa"
+                    },
+                    new ConfiguredIpLocationService.IpLocationMappingOptions
+                    {
+                        Cidr = "198.51.100.0/24",
+                        CountryCode = "US",
+                        CountryName = "United States"
+                    },
+                    new ConfiguredIpLocationService.IpLocationMappingOptions
+                    {
+                        Cidr = "192.0.2.0/24",
+                        CountryCode = "GB",
+                        CountryName = "United Kingdom"
+                    },
+                    new ConfiguredIpLocationService.IpLocationMappingOptions
+                    {
+                        Cidr = "10.0.0.0/8",
+                        CountryCode = "PRIVATE",
+                        CountryName = "Private Network",
+                        IsReliable = false
+                    },
+                    new ConfiguredIpLocationService.IpLocationMappingOptions
+                    {
+                        Cidr = "172.16.0.0/12",
+                        CountryCode = "PRIVATE",
+                        CountryName = "Private Network",
+                        IsReliable = false
+                    },
+                    new ConfiguredIpLocationService.IpLocationMappingOptions
+                    {
+                        Cidr = "192.168.0.0/16",
+                        CountryCode = "PRIVATE",
+                        CountryName = "Private Network",
+                        IsReliable = false
+                    }
+                ];
+            });
         services.AddScoped<ITransactionRepository, InMemoryTransactionRepository>();
         services.AddScoped<IEvaluationRepository, InMemoryEvaluationRepository>();
         services.AddScoped<IRuleRepository, InMemoryRuleRepository>();
         services.AddScoped<IVelocityService, InMemoryVelocityService>();
+        services.AddSingleton<IIpLocationService, ConfiguredIpLocationService>();
         services.AddScoped<IRulesEngineService, RulesEngineService>();
 
         services.AddHealthChecks()
@@ -116,17 +163,35 @@ public static class IntegrationTestDependencyInjection
         }
 
         public Task<bool> ExistsRecentDuplicateAsync(string accountId, decimal amount, string merchantName,
-            DateTimeOffset since, CancellationToken cancellationToken = default)
+            DateTimeOffset since, Guid? excludeTransactionId = null, CancellationToken cancellationToken = default)
         {
             lock (_store.SyncRoot)
             {
                 bool isDuplicate = _store.Transactions.Any(transaction =>
+                    (!excludeTransactionId.HasValue || transaction.Id != excludeTransactionId.Value) &&
                     transaction.AccountId == accountId &&
                     transaction.Amount == amount &&
                     transaction.MerchantName == merchantName &&
                     transaction.Timestamp >= since);
 
                 return Task.FromResult(isDuplicate);
+            }
+        }
+
+        public Task<IEnumerable<Transaction>> GetRecentByAccountAsync(string accountId, DateTimeOffset since,
+            Guid? excludeTransactionId = null, CancellationToken cancellationToken = default)
+        {
+            lock (_store.SyncRoot)
+            {
+                IEnumerable<Transaction> transactions = _store.Transactions
+                    .Where(transaction =>
+                        (!excludeTransactionId.HasValue || transaction.Id != excludeTransactionId.Value) &&
+                        transaction.AccountId == accountId &&
+                        transaction.Timestamp >= since)
+                    .OrderByDescending(transaction => transaction.Timestamp)
+                    .ToList();
+
+                return Task.FromResult(transactions);
             }
         }
     }

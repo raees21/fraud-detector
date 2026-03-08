@@ -13,6 +13,7 @@ namespace FraudEngine.Infrastructure.Services;
 internal sealed class RulesEngineService : IRulesEngineService
 {
     private static readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly IIpLocationService _ipLocationService;
     private readonly ILogger<RulesEngineService> _logger;
     private readonly IRuleRepository _ruleRepository;
     private readonly Dictionary<string, int> _ruleScores = new();
@@ -28,11 +29,13 @@ internal sealed class RulesEngineService : IRulesEngineService
         IRuleRepository ruleRepository,
         ITransactionRepository transactionRepository,
         IVelocityService velocityService,
+        IIpLocationService ipLocationService,
         ILogger<RulesEngineService> logger)
     {
         _ruleRepository = ruleRepository;
         _transactionRepository = transactionRepository;
         _velocityService = velocityService;
+        _ipLocationService = ipLocationService;
         _logger = logger;
     }
 
@@ -91,7 +94,10 @@ internal sealed class RulesEngineService : IRulesEngineService
             transaction.Amount,
             transaction.MerchantName,
             DateTimeOffset.UtcNow.AddMinutes(-5),
+            transaction.Id,
             cancellationToken);
+        (bool hasRecentLocationChange, string currentCountryCode, string previousCountryCode) =
+            await EvaluateRecentLocationChangeAsync(transaction, cancellationToken);
 
         // Provide necessary data for evaluation
         dynamic[] inputs = new dynamic[]
@@ -101,7 +107,10 @@ internal sealed class RulesEngineService : IRulesEngineService
             {
                 VelocityCount = velocityCount,
                 IsDuplicate = isDuplicate,
-                CurrentHourUtc = DateTimeOffset.UtcNow.Hour
+                CurrentHourUtc = DateTimeOffset.UtcNow.Hour,
+                CurrentCountryCode = currentCountryCode,
+                PreviousCountryCode = previousCountryCode,
+                HasRecentLocationChange = hasRecentLocationChange
             }
         };
 
@@ -139,5 +148,36 @@ internal sealed class RulesEngineService : IRulesEngineService
         if (score >= 70) return Decision.BLOCK;
         if (score >= 40) return Decision.REVIEW;
         return Decision.ALLOW;
+    }
+
+    private async Task<(bool HasRecentLocationChange, string CurrentCountryCode, string PreviousCountryCode)>
+        EvaluateRecentLocationChangeAsync(Transaction transaction, CancellationToken cancellationToken)
+    {
+        IpLocationResult currentLocation = await _ipLocationService.ResolveAsync(transaction.IPAddress, cancellationToken);
+        string currentCountryCode = currentLocation.CountryCode ?? string.Empty;
+        if (!currentLocation.IsReliable || string.IsNullOrWhiteSpace(currentCountryCode))
+            return (false, string.Empty, string.Empty);
+
+        IEnumerable<Transaction> recentTransactions = await _transactionRepository.GetRecentByAccountAsync(
+            transaction.AccountId,
+            DateTimeOffset.UtcNow.AddHours(-24),
+            transaction.Id,
+            cancellationToken);
+
+        foreach (Transaction recentTransaction in recentTransactions)
+        {
+            if (string.IsNullOrWhiteSpace(recentTransaction.IPAddress))
+                continue;
+
+            IpLocationResult recentLocation =
+                await _ipLocationService.ResolveAsync(recentTransaction.IPAddress, cancellationToken);
+            if (!recentLocation.IsReliable || string.IsNullOrWhiteSpace(recentLocation.CountryCode))
+                continue;
+
+            if (!string.Equals(recentLocation.CountryCode, currentCountryCode, StringComparison.OrdinalIgnoreCase))
+                return (true, currentCountryCode, recentLocation.CountryCode);
+        }
+
+        return (false, currentCountryCode, string.Empty);
     }
 }

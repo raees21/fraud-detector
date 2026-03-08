@@ -40,7 +40,7 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
     }
 
     [Fact]
-    public async Task PostTransaction_WithOptionalTelemetryOmitted_ReturnsAllowAndIsQueryable()
+    public async Task PostTransaction_WithRequiredTelemetry_ReturnsAllowAndIsQueryable()
     {
         using HttpClient client = CreateAuthenticatedClient();
         string accountId = $"ACC-{Guid.NewGuid():N}";
@@ -50,8 +50,8 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             "ZAR",
             "Contoso",
             "RETAIL",
-            null,
-            null,
+            "203.0.113.10",
+            "DEVICE-001",
             365,
             DateTimeOffset.UtcNow);
 
@@ -86,8 +86,8 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             "US",
             "Contoso",
             "RETAIL",
-            null,
-            null,
+            "203.0.113.10",
+            "DEVICE-001",
             365,
             DateTimeOffset.UtcNow);
 
@@ -97,6 +97,31 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
         JsonElement payload = await ReadJsonAsync(response);
         Assert.Equal("Validation.InvalidInput", payload.GetProperty("error").GetString());
         Assert.Contains("Currency", payload.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task PostTransaction_WithoutRequiredTelemetry_ReturnsBadRequest()
+    {
+        using HttpClient client = CreateAuthenticatedClient();
+        var transaction = new
+        {
+            accountId = $"ACC-{Guid.NewGuid():N}",
+            amount = 149.99m,
+            currency = "ZAR",
+            merchantName = "Contoso",
+            merchantCategory = "RETAIL",
+            ipAddress = string.Empty,
+            deviceId = string.Empty,
+            accountAgeDays = 365,
+            timestamp = DateTimeOffset.UtcNow
+        };
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/transactions", transaction);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        JsonElement payload = await ReadJsonAsync(response);
+        Assert.Contains("IPAddress is required", payload.GetProperty("message").GetString());
+        Assert.Contains("DeviceId is required", payload.GetProperty("message").GetString());
     }
 
     [Fact]
@@ -110,8 +135,8 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             "ZAR",
             "Contoso",
             "RETAIL",
-            null,
-            null,
+            "203.0.113.10",
+            "DEVICE-001",
             365,
             DateTimeOffset.UtcNow);
 
@@ -130,6 +155,45 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             .Any(item => item.GetProperty("transactionId").GetGuid() == evaluation.TransactionId);
 
         Assert.True(containsTransaction);
+    }
+
+    [Fact]
+    public async Task PostTransaction_WhenRecentActivityIsFromDifferentCountry_ReturnsReview()
+    {
+        using HttpClient client = CreateAuthenticatedClient();
+        string accountId = $"ACC-{Guid.NewGuid():N}";
+        var firstTransaction = new TransactionDto(
+            accountId,
+            99.99m,
+            "ZAR",
+            "Contoso",
+            "RETAIL",
+            "203.0.113.10",
+            "DEVICE-001",
+            365,
+            DateTimeOffset.UtcNow.AddMinutes(-1));
+        var secondTransaction = new TransactionDto(
+            accountId,
+            129.99m,
+            "ZAR",
+            "Contoso",
+            "RETAIL",
+            "198.51.100.10",
+            "DEVICE-002",
+            365,
+            DateTimeOffset.UtcNow);
+
+        HttpResponseMessage firstResponse = await client.PostAsJsonAsync("/api/v1/transactions", firstTransaction);
+        HttpResponseMessage secondResponse = await client.PostAsJsonAsync("/api/v1/transactions", secondTransaction);
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+
+        FraudEvaluationResultDto? secondEvaluation =
+            await secondResponse.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
+
+        Assert.NotNull(secondEvaluation);
+        Assert.Equal("REVIEW", secondEvaluation!.Decision);
     }
 
     [Fact]
