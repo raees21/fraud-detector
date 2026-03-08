@@ -13,6 +13,30 @@ The project is built with ASP.NET Core, PostgreSQL, Redis, MediatR, and [Microso
 - Protects partner-facing endpoints with API key authentication.
 - Applies rate limiting per authenticated client.
 
+## Security Features
+
+- Non-root Docker user: the API container runs as `appuser:10001`, not `root`.
+- API authentication: partner-facing endpoints require `X-Client-Id` and `X-Api-Key`, with only the SHA-256 API key hash stored in configuration.
+- Rate limiting configured: ASP.NET Core token-bucket rate limiting is applied globally per client, with a stricter policy on transaction submissions.
+- Container hardening: the API container uses a read-only filesystem, `no-new-privileges`, `cap_drop: ALL`, and writable `tmpfs` only for `/tmp`.
+- Container resource limits: Docker Compose sets CPU, memory, and PID limits for the API, PostgreSQL, and Redis services.
+
+## Performance
+
+- Fast synchronous evaluation path: fraud decisions are returned in the request/response cycle without background job dependencies.
+- Redis-backed velocity checks: short-window transaction counts are stored in Redis instead of recalculating them from PostgreSQL on every request.
+- Database-backed history with bounded reads: transaction and evaluation history endpoints are paginated by default with `page=1` and `pageSize=20`, and `pageSize` is capped.
+- Lightweight response models: write endpoints return a compact decision payload instead of full entity graphs.
+- Burst handling: token-bucket rate limiting absorbs short bursts while preventing unbounded abuse against the API.
+
+## Scalability
+
+- Stateless API layer: the API can be scaled horizontally because request processing does not rely on in-memory session state.
+- Separated infrastructure concerns: PostgreSQL handles durable transaction/evaluation storage, while Redis handles high-frequency short-window checks.
+- Rules are data-driven: Microsoft RulesEngine workflows are loaded from stored rule definitions, so rule updates do not require code changes for every fraud adjustment.
+- Containerized deployment: the service can be run locally with Docker Compose and moved to a container platform with the same runtime model.
+- Current limitation: the built-in ASP.NET Core rate limiter is node-local. In a multi-instance production deployment, rate limiting should be enforced at the gateway/edge or replaced with a distributed strategy.
+
 ## Seeded Fraud Rules
 
 On startup, the application seeds or refreshes the default fraud rules stored in PostgreSQL.
