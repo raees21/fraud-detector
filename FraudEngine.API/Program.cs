@@ -139,7 +139,10 @@ builder.Services.AddApiVersioning(options =>
 });
 
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+if (builder.Environment.IsEnvironment("IntegrationTesting"))
+    builder.Services.AddIntegrationTestInfrastructure();
+else
+    builder.Services.AddInfrastructure(builder.Configuration);
 
 WebApplication app = builder.Build();
 
@@ -162,18 +165,21 @@ app.MapControllers();
 // Apply Migrations and Seed Database
 using (IServiceScope scope = app.Services.CreateScope())
 {
-    AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    try
+    AppDbContext? context = scope.ServiceProvider.GetService<AppDbContext>();
+    if (context is not null)
     {
-        Log.Information("Applying Database Migrations...");
+        try
+        {
+            Log.Information("Applying Database Migrations...");
 
-        await context.Database.EnsureCreatedAsync();
+            await context.Database.EnsureCreatedAsync();
 
-        if (await context.Database.CanConnectAsync()) await AppDbContextSeed.SeedAsync(context);
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "An error occurred during database seeding/migration checks.");
+            if (await context.Database.CanConnectAsync()) await AppDbContextSeed.SeedAsync(context);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "An error occurred during database seeding/migration checks.");
+        }
     }
 }
 

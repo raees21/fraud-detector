@@ -1,0 +1,52 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+concurrency:
+  group: build-and-test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    env:
+      DOTNET_NOLOGO: true
+      ContinuousIntegrationBuild: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/packages.lock.json
+
+      - name: Restore
+        run: dotnet restore FraudEngine.sln
+
+      - name: Build
+        run: dotnet build FraudEngine.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test FraudEngine.sln --configuration Release --no-build --logger "trx;LogFilePrefix=test-results" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: ignore
