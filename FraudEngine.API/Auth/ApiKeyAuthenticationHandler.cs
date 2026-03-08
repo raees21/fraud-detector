@@ -9,7 +9,7 @@ namespace FraudEngine.API.Auth;
 /// <summary>
 /// Authenticates machine-to-machine callers using partner client IDs and API keys.
 /// </summary>
-public class ApiKeyAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     private readonly IOptionsMonitor<ApiKeyAuthOptions> _apiKeyOptions;
 

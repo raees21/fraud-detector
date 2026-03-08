@@ -10,7 +10,7 @@ namespace FraudEngine.Infrastructure.Services;
 /// <summary>
 /// Implementation of <see cref="IRulesEngineService"/> using Microsoft RulesEngine.
 /// </summary>
-public class RulesEngineService : IRulesEngineService
+internal sealed class RulesEngineService : IRulesEngineService
 {
     private static readonly SemaphoreSlim _semaphore = new(1, 1);
     private readonly ILogger<RulesEngineService> _logger;

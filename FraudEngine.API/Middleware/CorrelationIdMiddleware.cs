@@ -6,7 +6,7 @@ namespace FraudEngine.API.Middleware;
 /// Middleware that ensures a Correlation ID is present on all requests and responses,
 /// and pushes it into the Serilog logging context for distributed tracing.
 /// </summary>
-public class CorrelationIdMiddleware
+internal sealed class CorrelationIdMiddleware
 {
     private const string CorrelationIdHeader = "X-Correlation-Id";
     private readonly RequestDelegate _next;

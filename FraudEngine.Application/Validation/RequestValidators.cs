@@ -10,7 +10,7 @@ namespace FraudEngine.Application.Validation;
 /// <summary>
 /// Validates incoming transaction evaluation requests before they reach persistence or rule execution.
 /// </summary>
-public class EvaluateTransactionCommandValidator : AbstractValidator<EvaluateTransactionCommand>
+internal sealed class EvaluateTransactionCommandValidator : AbstractValidator<EvaluateTransactionCommand>
 {
     public EvaluateTransactionCommandValidator()
     {
@@ -62,7 +62,7 @@ public class EvaluateTransactionCommandValidator : AbstractValidator<EvaluateTra
 /// <summary>
 /// Validates historical transaction query parameters to keep query cost bounded.
 /// </summary>
-public class GetTransactionsQueryValidator : AbstractValidator<GetTransactionsQuery>
+internal sealed class GetTransactionsQueryValidator : AbstractValidator<GetTransactionsQuery>
 {
     public GetTransactionsQueryValidator()
     {
@@ -100,7 +100,7 @@ public class GetTransactionsQueryValidator : AbstractValidator<GetTransactionsQu
 /// <summary>
 /// Validates evaluation history query parameters to keep query cost bounded.
 /// </summary>
-public class GetEvaluationsQueryValidator : AbstractValidator<GetEvaluationsQuery>
+internal sealed class GetEvaluationsQueryValidator : AbstractValidator<GetEvaluationsQuery>
 {
     public GetEvaluationsQueryValidator()
     {

@@ -6,7 +6,7 @@ namespace FraudEngine.API.Middleware;
 /// <summary>
 /// Middleware that intercepts unhandled exceptions globally and formats a standardized JSON response.
 /// </summary>
-public class ExceptionHandlingMiddleware
+internal sealed class ExceptionHandlingMiddleware
 {
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
     private readonly RequestDelegate _next;

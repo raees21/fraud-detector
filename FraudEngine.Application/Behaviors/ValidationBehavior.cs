@@ -8,7 +8,7 @@ namespace FraudEngine.Application.Behaviors;
 /// <summary>
 /// Executes FluentValidation validators before handlers to fail fast on invalid input.
 /// </summary>
-public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+internal sealed class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
     where TResponse : Result
 {

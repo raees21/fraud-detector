@@ -7,7 +7,7 @@ namespace FraudEngine.Infrastructure.Persistence.Repositories;
 /// <summary>
 /// Implementation of <see cref="IRuleRepository"/> using Entity Framework Core.
 /// </summary>
-public class RuleRepository : IRuleRepository
+internal sealed class RuleRepository : IRuleRepository
 {
     private readonly AppDbContext _context;
 

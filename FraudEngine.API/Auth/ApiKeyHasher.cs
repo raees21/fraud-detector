@@ -6,9 +6,9 @@ namespace FraudEngine.API.Auth;
 /// <summary>
 /// Computes and verifies API key hashes without storing plaintext partner secrets.
 /// </summary>
-public static class ApiKeyHasher
+internal static class ApiKeyHasher
 {
-    public static string ComputeHash(string apiKey)
+    internal static string ComputeHash(string apiKey)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new ArgumentException("API key can not be empty.", nameof(apiKey));
@@ -17,7 +17,7 @@ public static class ApiKeyHasher
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
-    public static bool IsValidHash(string? hash)
+    internal static bool IsValidHash(string? hash)
     {
         if (string.IsNullOrWhiteSpace(hash) || hash.Length != 64)
             return false;
@@ -33,7 +33,7 @@ public static class ApiKeyHasher
         }
     }
 
-    public static bool Verify(string providedApiKey, string expectedHash)
+    internal static bool Verify(string providedApiKey, string expectedHash)
     {
         if (string.IsNullOrWhiteSpace(providedApiKey) || !IsValidHash(expectedHash))
             return false;

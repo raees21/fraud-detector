@@ -6,7 +6,7 @@ namespace FraudEngine.Infrastructure.Services;
 /// <summary>
 /// Implementation of <see cref="IVelocityService"/> using Redis to track transaction velocity.
 /// </summary>
-public class VelocityService : IVelocityService
+internal sealed class VelocityService : IVelocityService
 {
     private readonly IConnectionMultiplexer _redis;
     private readonly TimeSpan _window = TimeSpan.FromSeconds(60);

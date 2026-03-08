@@ -7,7 +7,7 @@ namespace FraudEngine.Infrastructure.Persistence.Repositories;
 /// <summary>
 /// Implementation of <see cref="ITransactionRepository"/> using Entity Framework Core.
 /// </summary>
-public class TransactionRepository : ITransactionRepository
+internal sealed class TransactionRepository : ITransactionRepository
 {
     private readonly AppDbContext _context;
 

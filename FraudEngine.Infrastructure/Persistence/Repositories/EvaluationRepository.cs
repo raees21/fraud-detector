@@ -8,7 +8,7 @@ namespace FraudEngine.Infrastructure.Persistence.Repositories;
 /// <summary>
 /// Implementation of <see cref="IEvaluationRepository"/> using Entity Framework Core.
 /// </summary>
-public class EvaluationRepository : IEvaluationRepository
+internal sealed class EvaluationRepository : IEvaluationRepository
 {
     private readonly AppDbContext _context;
 

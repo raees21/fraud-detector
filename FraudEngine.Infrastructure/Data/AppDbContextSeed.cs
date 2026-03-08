@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FraudEngine.Domain.Entities;
 using FraudEngine.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using RulesEngine.Models;
 
 namespace FraudEngine.Infrastructure.Data;
@@ -15,29 +16,55 @@ public static class AppDbContextSeed
     /// </summary>
     public static async Task SeedAsync(AppDbContext context)
     {
-        if (!context.RuleDefinitions.Any())
-        {
-            var rules = new List<RuleDefinition>
-            {
-                CreateRule("HIGH_AMOUNT_RULE", "Transaction exceeds high-value threshold", 35,
-                    "input1.Amount > 10000"),
-                CreateRule("VELOCITY_RULE", "Velocity threshold exceeded", 40,
-                    "input2.VelocityCount > 3"),
-                CreateRule("SUSPICIOUS_HOUR_RULE", "Transaction during high-risk hours", 15,
-                    "input2.CurrentHourUtc >= 1 AND input2.CurrentHourUtc <= 4"),
-                CreateRule("HIGH_RISK_MERCHANT_RULE", "High-risk merchant category", 25,
-                    "new[] { \"GAMBLING\", \"CRYPTO\", \"ADULT\" }.Contains(input1.MerchantCategory)"),
-                CreateRule("NEW_ACCOUNT_RULE", "Account created less than 7 days ago", 20,
-                    "input1.AccountAgeDays < 7"),
-                CreateRule("DUPLICATE_TRANSACTION_RULE", "Possible duplicate transaction", 35,
-                    "input2.IsDuplicate == true"),
-                CreateRule("FOREIGN_CURRENCY_HIGH_AMOUNT_RULE", "High-value foreign currency transaction", 20,
-                    "input1.Currency != \"USD\" AND input1.Amount > 5000")
-            };
+        IReadOnlyList<RuleDefinition> seededRules = GetSeedRules();
+        List<RuleDefinition> existingRules = await context.RuleDefinitions.ToListAsync();
+        var existingRulesByName = existingRules.ToDictionary(rule => rule.RuleName, StringComparer.OrdinalIgnoreCase);
+        bool hasChanges = false;
 
-            await context.RuleDefinitions.AddRangeAsync(rules);
-            await context.SaveChangesAsync();
+        foreach (RuleDefinition seededRule in seededRules)
+        {
+            if (existingRulesByName.TryGetValue(seededRule.RuleName, out RuleDefinition? existingRule))
+            {
+                if (existingRule.Description != seededRule.Description ||
+                    existingRule.ScoreContribution != seededRule.ScoreContribution ||
+                    existingRule.WorkflowJson != seededRule.WorkflowJson)
+                {
+                    existingRule.Description = seededRule.Description;
+                    existingRule.ScoreContribution = seededRule.ScoreContribution;
+                    existingRule.WorkflowJson = seededRule.WorkflowJson;
+                    hasChanges = true;
+                }
+            }
+            else
+            {
+                await context.RuleDefinitions.AddAsync(seededRule);
+                hasChanges = true;
+            }
         }
+
+        if (hasChanges)
+            await context.SaveChangesAsync();
+    }
+
+    internal static IReadOnlyList<RuleDefinition> GetSeedRules()
+    {
+        return new List<RuleDefinition>
+        {
+            CreateRule("HIGH_AMOUNT_RULE", "Transaction exceeds high-value threshold", 35,
+                "input1.Amount > 10000"),
+            CreateRule("VELOCITY_RULE", "Velocity threshold exceeded", 40,
+                "input2.VelocityCount > 3"),
+            CreateRule("SUSPICIOUS_HOUR_RULE", "Transaction during high-risk hours", 15,
+                "input2.CurrentHourUtc >= 1 AND input2.CurrentHourUtc <= 4"),
+            CreateRule("HIGH_RISK_MERCHANT_RULE", "High-risk merchant category", 25,
+                "new[] { \"GAMBLING\", \"CRYPTO\", \"ADULT\" }.Contains(input1.MerchantCategory)"),
+            CreateRule("NEW_ACCOUNT_RULE", "Account created less than 7 days ago", 20,
+                "input1.AccountAgeDays < 7"),
+            CreateRule("DUPLICATE_TRANSACTION_RULE", "Possible duplicate transaction", 35,
+                "input2.IsDuplicate == true"),
+            CreateRule("FOREIGN_CURRENCY_HIGH_AMOUNT_RULE", "High-value foreign currency transaction", 20,
+                "input1.Currency != \"ZAR\" AND input1.Amount > 5000")
+        };
     }
 
     /// <summary>
