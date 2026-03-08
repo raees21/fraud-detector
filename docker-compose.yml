@@ -5,6 +5,16 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5050:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    cpus: "1.00"
+    pids_limit: 256
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=fraud_db;Username=fraud_engine;Password=fraud_engine_dev_password
@@ -17,6 +27,9 @@ services:
 
   postgres:
     image: postgres:15-alpine
+    mem_limit: 768m
+    cpus: "1.00"
+    pids_limit: 256
     environment:
       POSTGRES_DB: fraud_db
       POSTGRES_USER: fraud_engine
@@ -31,6 +44,9 @@ services:
 
   redis:
     image: redis:7-alpine
+    mem_limit: 256m
+    cpus: "0.50"
+    pids_limit: 128
     command: [ "redis-server", "--requirepass", "redis_dev_password", "--appendonly", "yes" ]
     volumes:
       - redis_data:/data

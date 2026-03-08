@@ -14,5 +14,12 @@ RUN dotnet publish "FraudEngine.API.csproj" -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+ENV ASPNETCORE_URLS=http://+:8080 \
+    DOTNET_EnableDiagnostics=0
+RUN groupadd --gid 10001 appgroup \
+    && useradd --uid 10001 --gid appgroup --create-home --shell /usr/sbin/nologin appuser
 COPY --from=build /app/publish .
+RUN chown -R appuser:appgroup /app
+USER appuser
+EXPOSE 8080
 ENTRYPOINT ["dotnet", "FraudEngine.API.dll"]

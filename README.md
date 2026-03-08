@@ -32,6 +32,12 @@ This starts:
 - `postgres` inside Docker
 - `redis` inside Docker
 
+Container hardening in the default Docker setup:
+
+- the API container runs as a non-root user
+- the API container filesystem is read-only except for `/tmp`
+- Docker Compose applies conservative CPU, memory, and PID limits to the API, PostgreSQL, and Redis services
+
 No `.env` file is required for local evaluation. The demo database, Redis, and API auth values are already wired into:
 
 - `docker-compose.yml`
