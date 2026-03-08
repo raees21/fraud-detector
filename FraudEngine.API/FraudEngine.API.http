@@ -34,6 +34,18 @@ X-Api-Key: {{ApiKey}}
 
 ###
 
+GET {{FraudEngine.API_HostAddress}}/api/v1/transactions
+X-Client-Id: {{ClientId}}
+X-Api-Key: {{ApiKey}}
+
+###
+
+GET {{FraudEngine.API_HostAddress}}/api/v1/transactions?decision=REVIEW&accountId=ACC-10001&from=2026-03-01T00:00:00Z&to=2026-03-08T23:59:59Z
+X-Client-Id: {{ClientId}}
+X-Api-Key: {{ApiKey}}
+
+###
+
 GET {{FraudEngine.API_HostAddress}}/api/v1/transactions/{{TransactionId}}
 X-Client-Id: {{ClientId}}
 X-Api-Key: {{ApiKey}}
@@ -41,6 +53,12 @@ X-Api-Key: {{ApiKey}}
 ###
 
 GET {{FraudEngine.API_HostAddress}}/api/v1/evaluations?page=1&pageSize=20
+X-Client-Id: {{ClientId}}
+X-Api-Key: {{ApiKey}}
+
+###
+
+GET {{FraudEngine.API_HostAddress}}/api/v1/evaluations?decision=BLOCK&minScore=70
 X-Client-Id: {{ClientId}}
 X-Api-Key: {{ApiKey}}
 

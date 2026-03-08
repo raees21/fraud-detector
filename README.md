@@ -2,7 +2,7 @@
 
 Fraud Detector is a machine-to-machine fraud evaluation API. It accepts transaction data from partner systems such as payment processors or banks, evaluates the request against seeded fraud rules, stores the transaction and evaluation result, and exposes a small set of authenticated read APIs for operations and audit workflows.
 
-The project is built with ASP.NET Core, PostgreSQL, Redis, MediatR, and a rules engine. For local evaluation, the fastest path is Docker Compose.
+The project is built with ASP.NET Core, PostgreSQL, Redis, MediatR, and [Microsoft RulesEngine](https://github.com/microsoft/RulesEngine) for configurable fraud rule execution. For local evaluation, the fastest path is Docker Compose.
 
 ## What This Project Does
 
@@ -20,15 +20,7 @@ The project is built with ASP.NET Core, PostgreSQL, Redis, MediatR, and a rules 
 - Docker
 - Docker Compose
 
-### 1. Create the local environment file
-
-```sh
-cp .env.example .env
-```
-
-The defaults in `.env.example` are enough for local evaluation. If you want, replace them with stronger local-only values before starting the stack.
-
-### 2. Start the full stack
+### 1. Start the full stack
 
 ```sh
 docker compose up --build
@@ -40,7 +32,12 @@ This starts:
 - `postgres` inside Docker
 - `redis` inside Docker
 
-### 3. Confirm the API is healthy
+No `.env` file is required for local evaluation. The demo database, Redis, and API auth values are already wired into:
+
+- `docker-compose.yml`
+- `FraudEngine.API/appsettings.json`
+
+### 2. Confirm the API is healthy
 
 ```sh
 curl http://localhost:5050/api/v1/health
@@ -139,6 +136,11 @@ X-Client-Id: fraud-ops
 X-Api-Key: fraud-ops-dev-local-2026
 ```
 
+If `page` and `pageSize` are omitted, the API defaults to:
+
+- `page=1`
+- `pageSize=20`
+
 Optional filters:
 
 - `decision`
@@ -147,6 +149,14 @@ Optional filters:
 - `to`
 - `page`
 - `pageSize`
+
+Example using filters:
+
+```http
+GET /api/v1/transactions?decision=REVIEW&accountId=ACC-10001&from=2026-03-01T00:00:00Z&to=2026-03-08T23:59:59Z
+X-Client-Id: fraud-ops
+X-Api-Key: fraud-ops-dev-local-2026
+```
 
 Example response:
 
@@ -186,12 +196,25 @@ X-Client-Id: fraud-ops
 X-Api-Key: fraud-ops-dev-local-2026
 ```
 
+If `page` and `pageSize` are omitted, the API defaults to:
+
+- `page=1`
+- `pageSize=20`
+
 Optional filters:
 
 - `decision`
 - `minScore`
 - `page`
 - `pageSize`
+
+Example using filters:
+
+```http
+GET /api/v1/evaluations?decision=BLOCK&minScore=70
+X-Client-Id: fraud-ops
+X-Api-Key: fraud-ops-dev-local-2026
+```
 
 Example response:
 
@@ -285,6 +308,16 @@ curl "http://localhost:5050/api/v1/evaluations?page=1&pageSize=20" \
   -H "X-Api-Key: fraud-ops-dev-local-2026"
 ```
 
+### Read transactions without paging filters
+
+```sh
+curl "http://localhost:5050/api/v1/transactions" \
+  -H "X-Client-Id: fraud-ops" \
+  -H "X-Api-Key: fraud-ops-dev-local-2026"
+```
+
+This returns the first page with 20 results by default.
+
 ## Validation Rules
 
 The API rejects malformed requests before evaluation. Examples:
@@ -369,4 +402,4 @@ The request body or query parameters failed validation. Check the response error
 
 - Docker Compose runs the API in `Production`, so Swagger is not exposed there.
 - If you want Swagger locally, run the API directly in Development with `dotnet run --project FraudEngine.API`.
-- The checked-in credentials are demo-only and exist purely to make local evaluation easy.
+- The checked-in database, Redis, and API credentials are demo-only and exist purely to make local evaluation easy.
