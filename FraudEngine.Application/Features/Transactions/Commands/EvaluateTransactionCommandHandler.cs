@@ -64,9 +64,8 @@ public class
 
         return Result<FraudEvaluationResultDto>.Success(new FraudEvaluationResultDto(
             transaction.Id,
-            evaluation.RiskScore,
             evaluation.Decision.ToString(),
-            evaluation.TriggeredRules
+            evaluation.EvaluatedAt
         ));
     }
 }

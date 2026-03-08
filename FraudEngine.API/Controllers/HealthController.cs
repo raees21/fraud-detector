@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 
 namespace FraudEngine.API.Controllers;
 
@@ -24,12 +25,13 @@ public class HealthController : ApiControllerBase
     /// </summary>
     /// <returns>The health report.</returns>
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetHealth()
     {
         HealthReport report = await _healthCheckService.CheckHealthAsync();
 
         return report.Status == HealthStatus.Healthy
-            ? Ok(new { Status = report.Status.ToString(), Details = report.Entries })
-            : StatusCode(503, new { Status = report.Status.ToString(), Details = report.Entries });
+            ? Ok(new { Status = report.Status.ToString() })
+            : StatusCode(503, new { Status = report.Status.ToString() });
     }
 }

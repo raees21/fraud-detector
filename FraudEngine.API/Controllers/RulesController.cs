@@ -1,8 +1,11 @@
+using FraudEngine.API.Auth;
+using FraudEngine.Application.DTOs;
 using FraudEngine.Application.Features.Rules.Commands;
 using FraudEngine.Application.Features.Rules.Queries;
 using FraudEngine.Domain.Common;
 using FraudEngine.Domain.Entities;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 
@@ -28,6 +31,7 @@ public class RulesController : ApiControllerBase
     /// </summary>
     /// <returns>A list of rules.</returns>
     [HttpGet]
+    [Authorize(Policy = ApiAuthorizationPolicies.ReadRules)]
     public async Task<IActionResult> GetRules()
     {
         var query = new GetRulesQuery();
@@ -36,7 +40,7 @@ public class RulesController : ApiControllerBase
         if (result.IsFailure)
             return BadRequest(result.Error);
 
-        return Ok(result.Value);
+        return Ok(result.Value.Select(MapRule));
     }
 
     /// <summary>
@@ -45,6 +49,7 @@ public class RulesController : ApiControllerBase
     /// <param name="id">The rule ID.</param>
     /// <returns>The updated active status of the rule.</returns>
     [HttpPatch("{id:guid}/toggle")]
+    [Authorize(Policy = ApiAuthorizationPolicies.ManageRules)]
     public async Task<IActionResult> ToggleRule(Guid id)
     {
         var command = new ToggleRuleCommand(id);
@@ -54,5 +59,10 @@ public class RulesController : ApiControllerBase
             return NotFound(new { Error = result.Error.Code, result.Error.Message });
 
         return Ok(new { IsActive = result.Value });
+    }
+
+    private static RuleSummaryDto MapRule(RuleDefinition rule)
+    {
+        return new RuleSummaryDto(rule.Id, rule.RuleName, rule.Description, rule.IsActive);
     }
 }

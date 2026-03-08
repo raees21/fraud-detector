@@ -31,6 +31,8 @@ public class TransactionScenarios : IClassFixture<WebApplicationFactory<Program>
     {
         // Arrange
         HttpClient client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Client-Id", "partner-sandbox");
+        client.DefaultRequestHeaders.Add("X-Api-Key", "replace-with-client-secret");
         var dto = new TransactionDto(
             "USER_123",
             1500,
@@ -51,5 +53,6 @@ public class TransactionScenarios : IClassFixture<WebApplicationFactory<Program>
         FraudEvaluationResultDto? result = await response.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
         Assert.NotNull(result);
         Assert.Equal("ALLOW", result!.Decision);
+        Assert.NotEqual(default, result.EvaluatedAt);
     }
 }

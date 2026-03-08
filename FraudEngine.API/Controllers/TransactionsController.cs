@@ -1,9 +1,12 @@
+using FraudEngine.API.Auth;
 using FraudEngine.Application.DTOs;
 using FraudEngine.Application.Features.Transactions.Commands;
 using FraudEngine.Application.Features.Transactions.Queries;
 using FraudEngine.Domain.Common;
 using FraudEngine.Domain.Entities;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 
@@ -28,8 +31,11 @@ public class TransactionsController : ApiControllerBase
     /// Evaluates a new transaction against the active fraud rules.
     /// </summary>
     /// <param name="dto">The transaction details.</param>
-    /// <returns>The evaluation result with risk score and decision.</returns>
+    /// <returns>The evaluation result with the final decision.</returns>
     [HttpPost]
+    [Authorize(Policy = ApiAuthorizationPolicies.SubmitTransactions)]
+    [EnableRateLimiting("transaction-submissions")]
+    [RequestSizeLimit(16 * 1024)]
     public async Task<IActionResult> EvaluateTransaction([FromBody] TransactionDto dto)
     {
         var command = new EvaluateTransactionCommand(dto);
@@ -51,6 +57,7 @@ public class TransactionsController : ApiControllerBase
     /// <param name="pageSize">The number of items per page.</param>
     /// <returns>A paginated list of transactions.</returns>
     [HttpGet]
+    [Authorize(Policy = ApiAuthorizationPolicies.ReadTransactions)]
     public async Task<IActionResult> GetTransactions(
         [FromQuery] string? decision,
         [FromQuery] string? accountId,
@@ -65,7 +72,13 @@ public class TransactionsController : ApiControllerBase
         if (result.IsFailure)
             return BadRequest(result.Error);
 
-        return Ok(new { Data = result.Value.Items, result.Value.TotalCount, Page = page, PageSize = pageSize });
+        return Ok(new
+        {
+            Data = result.Value.Items.Select(MapTransaction),
+            result.Value.TotalCount,
+            Page = page,
+            PageSize = pageSize
+        });
     }
 
     /// <summary>
@@ -74,6 +87,7 @@ public class TransactionsController : ApiControllerBase
     /// <param name="id">The transaction ID.</param>
     /// <returns>The transaction details if found.</returns>
     [HttpGet("{id:guid}")]
+    [Authorize(Policy = ApiAuthorizationPolicies.ReadTransactions)]
     public async Task<IActionResult> GetTransactionById(Guid id)
     {
         var query = new GetTransactionByIdQuery(id);
@@ -82,6 +96,31 @@ public class TransactionsController : ApiControllerBase
         if (result.IsFailure)
             return NotFound(new { Error = result.Error.Code, result.Error.Message });
 
-        return Ok(result.Value);
+        return Ok(MapTransaction(result.Value));
+    }
+
+    private static TransactionSummaryDto MapTransaction(Transaction transaction)
+    {
+        return new TransactionSummaryDto(
+            transaction.Id,
+            MaskAccountId(transaction.AccountId),
+            transaction.Amount,
+            transaction.Currency,
+            transaction.MerchantName,
+            transaction.MerchantCategory,
+            transaction.Timestamp,
+            transaction.CreatedAt
+        );
+    }
+
+    private static string MaskAccountId(string accountId)
+    {
+        if (string.IsNullOrWhiteSpace(accountId))
+            return "****";
+
+        if (accountId.Length <= 4)
+            return new string('*', accountId.Length);
+
+        return $"{new string('*', accountId.Length - 4)}{accountId[^4..]}";
     }
 }

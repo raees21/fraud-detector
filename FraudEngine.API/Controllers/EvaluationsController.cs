@@ -1,8 +1,11 @@
+using FraudEngine.API.Auth;
 using FraudEngine.Application.Features.Evaluations.Queries;
+using FraudEngine.Application.DTOs;
 using FraudEngine.Domain.Common;
 using FraudEngine.Domain.Entities;
 using FraudEngine.Domain.Enums;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 
@@ -32,6 +35,7 @@ public class EvaluationsController : ApiControllerBase
     /// <param name="pageSize">The number of items per page.</param>
     /// <returns>A paginated list of fraud evaluation records.</returns>
     [HttpGet]
+    [Authorize(Policy = ApiAuthorizationPolicies.ReadEvaluations)]
     public async Task<IActionResult> GetEvaluations(
         [FromQuery] Decision? decision,
         [FromQuery] int? minScore,
@@ -44,6 +48,21 @@ public class EvaluationsController : ApiControllerBase
         if (result.IsFailure)
             return BadRequest(result.Error);
 
-        return Ok(new { Data = result.Value.Items, result.Value.TotalCount, Page = page, PageSize = pageSize });
+        return Ok(new
+        {
+            Data = result.Value.Items.Select(MapEvaluation),
+            result.Value.TotalCount,
+            Page = page,
+            PageSize = pageSize
+        });
+    }
+
+    private static FraudEvaluationSummaryDto MapEvaluation(FraudEvaluation evaluation)
+    {
+        return new FraudEvaluationSummaryDto(
+            evaluation.TransactionId,
+            evaluation.Decision.ToString(),
+            evaluation.EvaluatedAt
+        );
     }
 }

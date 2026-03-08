@@ -1,4 +1,11 @@
+using FluentValidation;
+using FraudEngine.Application.Behaviors;
+using FraudEngine.Application.Features.Evaluations.Queries;
+using FraudEngine.Application.Features.Transactions.Commands;
+using FraudEngine.Application.Features.Transactions.Queries;
+using FraudEngine.Application.Validation;
 using System.Reflection;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FraudEngine.Application;
@@ -16,6 +23,11 @@ public static class DependencyInjection
         Assembly assembly = typeof(DependencyInjection).Assembly;
 
         services.AddMediatR(configuration => { configuration.RegisterServicesFromAssembly(assembly); });
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+
+        services.AddScoped<IValidator<EvaluateTransactionCommand>, EvaluateTransactionCommandValidator>();
+        services.AddScoped<IValidator<GetTransactionsQuery>, GetTransactionsQueryValidator>();
+        services.AddScoped<IValidator<GetEvaluationsQuery>, GetEvaluationsQueryValidator>();
 
         return services;
     }

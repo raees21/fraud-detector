@@ -18,11 +18,43 @@ public record TransactionDto(
 );
 
 /// <summary>
-/// Data transfer object representing the result of a fraud evaluation.
+/// Data transfer object representing the sanitized result of a fraud evaluation.
 /// </summary>
 public record FraudEvaluationResultDto(
     Guid TransactionId,
-    int RiskScore,
     string Decision,
-    string TriggeredRules
+    DateTimeOffset EvaluatedAt
+);
+
+/// <summary>
+/// A sanitized view of transaction history safe for general API responses.
+/// </summary>
+public record TransactionSummaryDto(
+    Guid TransactionId,
+    string MaskedAccountId,
+    decimal Amount,
+    string Currency,
+    string MerchantName,
+    string MerchantCategory,
+    DateTimeOffset Timestamp,
+    DateTimeOffset CreatedAt
+);
+
+/// <summary>
+/// A sanitized view of fraud evaluation history safe for general API responses.
+/// </summary>
+public record FraudEvaluationSummaryDto(
+    Guid TransactionId,
+    string Decision,
+    DateTimeOffset EvaluatedAt
+);
+
+/// <summary>
+/// A limited rule definition view that excludes internal fraud logic details.
+/// </summary>
+public record RuleSummaryDto(
+    Guid Id,
+    string RuleName,
+    string Description,
+    bool IsActive
 );

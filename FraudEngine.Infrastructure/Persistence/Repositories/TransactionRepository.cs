@@ -40,7 +40,6 @@ public class TransactionRepository : ITransactionRepository
         CancellationToken cancellationToken = default)
     {
         IQueryable<Transaction> query = _context.Transactions
-            .Include(t => _context.FraudEvaluations.FirstOrDefault(e => e.TransactionId == t.Id))
             .AsNoTracking()
             .AsQueryable();
 
@@ -54,6 +53,8 @@ public class TransactionRepository : ITransactionRepository
             query = query.Where(t => t.Timestamp <= to.Value);
 
         if (!string.IsNullOrEmpty(decision))
+        {
+            string normalizedDecision = decision.Trim().ToUpperInvariant();
             // Join with evaluation to filter by decision
             query = query.Join(
                     _context.FraudEvaluations,
@@ -61,8 +62,9 @@ public class TransactionRepository : ITransactionRepository
                     e => e.TransactionId,
                     (t, e) => new { Transaction = t, Evaluation = e }
                 )
-                .Where(x => x.Evaluation.Decision.ToString() == decision)
+                .Where(x => x.Evaluation.Decision.ToString() == normalizedDecision)
                 .Select(x => x.Transaction);
+        }
 
         int totalCount = await query.CountAsync(cancellationToken);
 

@@ -13,15 +13,19 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        string? databaseConnectionString = configuration.GetConnectionString("DefaultConnection");
+        if (string.IsNullOrWhiteSpace(databaseConnectionString))
+            throw new InvalidOperationException("A PostgreSQL connection string is required.");
+
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+            options.UseNpgsql(databaseConnectionString));
 
         string? redisConnectionString = configuration.GetConnectionString("Redis");
-        if (!string.IsNullOrEmpty(redisConnectionString))
-        {
-            var multiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
-            services.AddSingleton<IConnectionMultiplexer>(multiplexer);
-        }
+        if (string.IsNullOrWhiteSpace(redisConnectionString))
+            throw new InvalidOperationException("A Redis connection string is required.");
+
+        var multiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
+        services.AddSingleton<IConnectionMultiplexer>(multiplexer);
 
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IEvaluationRepository, EvaluationRepository>();
@@ -32,7 +36,7 @@ public static class DependencyInjection
 
         services.AddHealthChecks()
             .AddDbContextCheck<AppDbContext>()
-            .AddRedis(configuration.GetConnectionString("Redis"));
+            .AddRedis(redisConnectionString);
 
         return services;
     }

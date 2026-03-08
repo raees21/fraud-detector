@@ -1,6 +1,57 @@
-@FraudEngine.API_HostAddress = http://localhost:5052
+@FraudEngine.API_HostAddress = http://localhost:5050
+@ClientId = fraud-ops
+@ApiKey = fraud-ops-dev-local-2026
+@TransactionId = 00000000-0000-0000-0000-000000000000
+@RuleId = 00000000-0000-0000-0000-000000000000
 
-GET {{FraudEngine.API_HostAddress}}/weatherforecast/
+GET {{FraudEngine.API_HostAddress}}/api/v1/health
 Accept: application/json
 
 ###
+
+POST {{FraudEngine.API_HostAddress}}/api/v1/transactions
+Content-Type: application/json
+X-Client-Id: {{ClientId}}
+X-Api-Key: {{ApiKey}}
+
+{
+  "accountId": "ACC-10001",
+  "amount": 149.99,
+  "currency": "USD",
+  "merchantName": "Contoso",
+  "merchantCategory": "RETAIL",
+  "ipAddress": "203.0.113.10",
+  "deviceId": "DEVICE-001",
+  "accountAgeDays": 365,
+  "timestamp": "2026-03-08T12:00:00Z"
+}
+
+###
+
+GET {{FraudEngine.API_HostAddress}}/api/v1/transactions?page=1&pageSize=20
+X-Client-Id: {{ClientId}}
+X-Api-Key: {{ApiKey}}
+
+###
+
+GET {{FraudEngine.API_HostAddress}}/api/v1/transactions/{{TransactionId}}
+X-Client-Id: {{ClientId}}
+X-Api-Key: {{ApiKey}}
+
+###
+
+GET {{FraudEngine.API_HostAddress}}/api/v1/evaluations?page=1&pageSize=20
+X-Client-Id: {{ClientId}}
+X-Api-Key: {{ApiKey}}
+
+###
+
+GET {{FraudEngine.API_HostAddress}}/api/v1/rules
+X-Client-Id: {{ClientId}}
+X-Api-Key: {{ApiKey}}
+
+###
+
+PATCH {{FraudEngine.API_HostAddress}}/api/v1/rules/{{RuleId}}/toggle
+X-Client-Id: {{ClientId}}
+X-Api-Key: {{ApiKey}}
