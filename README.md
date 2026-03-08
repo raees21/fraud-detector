@@ -180,8 +180,45 @@ Example response:
 ```json
 {
   "transactionId": "2f5de68a-879d-4268-ab30-cba1a7a4a353",
+  "accountId": "ACC-10001",
   "decision": "ALLOW",
+  "triggeredRules": [
+    "TRANSACTION_TYPE_CARD_RULE"
+  ],
   "evaluatedAt": "2026-03-08T12:00:00.1234567+00:00"
+}
+```
+
+Example request body that triggers multiple rules:
+
+```json
+{
+  "accountId": "ACC-10001",
+  "amount": 15000,
+  "currency": "ZAR",
+  "merchantName": "Contoso",
+  "merchantCategory": "CRYPTO",
+  "transactionType": "CARD",
+  "ipAddress": "203.0.113.10",
+  "deviceId": "DEVICE-001",
+  "accountAgeDays": 365,
+  "timestamp": "2026-03-08T12:00:00Z"
+}
+```
+
+Expected response:
+
+```json
+{
+  "transactionId": "caf96dc8-901a-4415-9cc9-caac49fd9dc0",
+  "accountId": "ACC-10001",
+  "decision": "BLOCK",
+  "triggeredRules": [
+    "TRANSACTION_TYPE_CARD_RULE",
+    "HIGH_RISK_MERCHANT_RULE",
+    "HIGH_AMOUNT_RULE"
+  ],
+  "evaluatedAt": "2026-03-08T23:42:31.5653485+00:00"
 }
 ```
 
@@ -343,6 +380,7 @@ curl -X POST http://localhost:5050/api/v1/transactions \
     "currency": "ZAR",
     "merchantName": "Contoso",
     "merchantCategory": "RETAIL",
+    "transactionType": "CARD",
     "ipAddress": "203.0.113.10",
     "deviceId": "DEVICE-001",
     "accountAgeDays": 365,

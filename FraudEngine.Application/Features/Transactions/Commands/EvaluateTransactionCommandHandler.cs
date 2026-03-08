@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FraudEngine.Application.DTOs;
 using FraudEngine.Application.Interfaces;
 using FraudEngine.Domain.Common;
@@ -65,8 +66,35 @@ public class
 
         return Result<FraudEvaluationResultDto>.Success(new FraudEvaluationResultDto(
             transaction.Id,
+            transaction.AccountId,
             evaluation.Decision.ToString(),
+            GetTriggeredRuleNames(triggeredRules),
             evaluation.EvaluatedAt
         ));
+    }
+
+    private static IReadOnlyList<string> GetTriggeredRuleNames(string triggeredRulesJson)
+    {
+        if (string.IsNullOrWhiteSpace(triggeredRulesJson))
+            return Array.Empty<string>();
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(triggeredRulesJson);
+            return document.RootElement.ValueKind != JsonValueKind.Array
+                ? Array.Empty<string>()
+                : document.RootElement.EnumerateArray()
+                    .Select(rule => rule.TryGetProperty("RuleName", out JsonElement ruleNameElement)
+                        ? ruleNameElement.GetString()
+                        : null)
+                    .Where(ruleName => !string.IsNullOrWhiteSpace(ruleName))
+                    .Cast<string>()
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<string>();
+        }
     }
 }

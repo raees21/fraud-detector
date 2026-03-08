@@ -66,6 +66,8 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
         Assert.NotNull(evaluation);
         Assert.Equal("ALLOW", evaluation!.Decision);
         Assert.NotEqual(Guid.Empty, evaluation.TransactionId);
+        Assert.Equal(accountId, evaluation.AccountId);
+        Assert.Contains("TRANSACTION_TYPE_EFT_RULE", evaluation.TriggeredRules);
 
         HttpResponseMessage historyResponse = await client.GetAsync(
             $"/api/v1/transactions?accountId={Uri.EscapeDataString(accountId)}");
@@ -204,6 +206,7 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
 
         Assert.NotNull(secondEvaluation);
         Assert.Equal("REVIEW", secondEvaluation!.Decision);
+        Assert.Contains("RECENT_LOCATION_CHANGE_RULE", secondEvaluation.TriggeredRules);
     }
 
     [Fact]
@@ -254,6 +257,7 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(evaluation);
         Assert.Equal("BLOCK", evaluation!.Decision);
+        Assert.Contains("REPEATED_DECLINED_TRANSACTION_RULE", evaluation.TriggeredRules);
     }
 
     [Fact]

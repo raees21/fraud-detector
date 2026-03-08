@@ -20,11 +20,13 @@ public record TransactionDto(
 );
 
 /// <summary>
-/// Data transfer object representing the sanitized result of a fraud evaluation.
+/// Data transfer object representing the result of a fraud evaluation.
 /// </summary>
 public record FraudEvaluationResultDto(
     Guid TransactionId,
+    string AccountId,
     string Decision,
+    IReadOnlyList<string> TriggeredRules,
     DateTimeOffset EvaluatedAt
 );
 
