@@ -30,6 +30,26 @@ public class SecurityValidationTests
     }
 
     [Fact]
+    public void EvaluateTransactionCommand_MissingIpAddressAndDeviceId_IsAccepted()
+    {
+        var validator = new EvaluateTransactionCommandValidator();
+        var command = new EvaluateTransactionCommand(new TransactionDto(
+            "ACC-10001",
+            25.50m,
+            "USD",
+            "Example Merchant",
+            "RETAIL",
+            null,
+            null,
+            365,
+            DateTimeOffset.UtcNow));
+
+        var result = validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void GetTransactionsQuery_PageSizeAboveMaximum_IsRejected()
     {
         var validator = new GetTransactionsQueryValidator();

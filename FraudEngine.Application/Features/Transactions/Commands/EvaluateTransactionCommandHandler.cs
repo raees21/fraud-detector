@@ -41,8 +41,8 @@ public class
             Currency = dto.Currency,
             MerchantName = dto.MerchantName,
             MerchantCategory = dto.MerchantCategory,
-            IPAddress = dto.IPAddress,
-            DeviceId = dto.DeviceId,
+            IPAddress = dto.IPAddress?.Trim() ?? string.Empty,
+            DeviceId = dto.DeviceId?.Trim() ?? string.Empty,
             AccountAgeDays = dto.AccountAgeDays,
             Timestamp = dto.Timestamp
         };

@@ -37,13 +37,13 @@ public class EvaluateTransactionCommandValidator : AbstractValidator<EvaluateTra
             .MaximumLength(50);
 
         RuleFor(command => command.Transaction.IPAddress)
-            .NotEmpty()
             .Must(BeValidIpAddress)
-            .WithMessage("IPAddress must be a valid IPv4 or IPv6 address.");
+            .WithMessage("IPAddress must be a valid IPv4 or IPv6 address when provided.")
+            .When(command => !string.IsNullOrWhiteSpace(command.Transaction.IPAddress));
 
         RuleFor(command => command.Transaction.DeviceId)
-            .NotEmpty()
-            .MaximumLength(100);
+            .MaximumLength(100)
+            .When(command => !string.IsNullOrWhiteSpace(command.Transaction.DeviceId));
 
         RuleFor(command => command.Transaction.AccountAgeDays)
             .InclusiveBetween(0, 36500);
@@ -53,9 +53,9 @@ public class EvaluateTransactionCommandValidator : AbstractValidator<EvaluateTra
             .WithMessage("Timestamp must be provided.");
     }
 
-    private static bool BeValidIpAddress(string ipAddress)
+    private static bool BeValidIpAddress(string? ipAddress)
     {
-        return IPAddress.TryParse(ipAddress, out _);
+        return string.IsNullOrWhiteSpace(ipAddress) || IPAddress.TryParse(ipAddress, out _);
     }
 }
 

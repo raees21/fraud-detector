@@ -111,8 +111,6 @@ Example request body:
   "currency": "USD",
   "merchantName": "Contoso",
   "merchantCategory": "RETAIL",
-  "ipAddress": "203.0.113.10",
-  "deviceId": "DEVICE-001",
   "accountAgeDays": 365,
   "timestamp": "2026-03-08T12:00:00Z"
 }
@@ -285,8 +283,6 @@ curl -X POST http://localhost:5050/api/v1/transactions \
     "currency": "USD",
     "merchantName": "Contoso",
     "merchantCategory": "RETAIL",
-    "ipAddress": "203.0.113.10",
-    "deviceId": "DEVICE-001",
     "accountAgeDays": 365,
     "timestamp": "2026-03-08T12:00:00Z"
   }'
@@ -323,7 +319,8 @@ This returns the first page with 20 results by default.
 The API rejects malformed requests before evaluation. Examples:
 
 - `currency` must be a 3-letter uppercase ISO code such as `USD`
-- `ipAddress` must be a valid IPv4 or IPv6 address
+- `ipAddress` is optional, but if provided it must be a valid IPv4 or IPv6 address
+- `deviceId` is optional
 - `amount` must be greater than `0`
 - `page` must be greater than `0`
 - `pageSize` must be between `1` and `100`
