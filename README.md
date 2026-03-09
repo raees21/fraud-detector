@@ -2,7 +2,21 @@
 
 Fraud Detector is a machine-to-machine fraud evaluation API. It accepts transaction data from partner systems such as payment processors or banks, evaluates the request against seeded fraud rules, stores the transaction and evaluation result, and exposes a small set of authenticated read APIs for operations and audit workflows.
 
-The project is built with ASP.NET Core, PostgreSQL, Redis, MediatR, and [Microsoft RulesEngine](https://github.com/microsoft/RulesEngine) for configurable fraud rule execution. For local evaluation, the fastest path is Docker Compose.
+## Technology Stack
+
+- ASP.NET Core (.NET 10) - Fraud evaluation API and HTTP request pipeline
+- Entity Framework Core 9 with Npgsql - PostgreSQL persistence and data access
+- PostgreSQL 15 - Durable storage for transactions, evaluations, and rule definitions
+- Redis 7 - Short-window velocity checks and fast state lookups
+- MediatR 14 - Application command and query handling
+- [Microsoft RulesEngine](https://github.com/microsoft/RulesEngine) 6 - Configurable fraud rule execution
+- xUnit 2 and Moq 4 - Unit and integration testing
+- Docker and Docker Compose - Containerization and local service orchestration
+- OpenAPI/Swagger - API documentation and local exploration
+
+## Architecture
+
+![Fraud Detector architecture](Architecture.png)
 
 ## What This Project Does
 
@@ -97,6 +111,7 @@ This starts:
 - `api` on `http://localhost:5050`
 - `postgres` inside Docker
 - `redis` inside Docker
+- Swagger UI on `http://localhost:5050/swagger`
 
 Container hardening in the default Docker setup:
 
@@ -122,6 +137,18 @@ Expected response:
   "status": "Healthy"
 }
 ```
+
+### 3. Open Swagger UI
+
+After the stack is running, open:
+
+- `http://localhost:5050/swagger`
+
+Swagger can be used to inspect and test the API directly in the browser.
+
+- `GET /api/v1/health` is available without authentication
+- all other `/api/v1/*` endpoints require `X-Client-Id` and `X-Api-Key`
+- use the demo credentials in the next section when testing protected endpoints
 
 ## Local Demo Credentials
 
@@ -506,9 +533,3 @@ You hit the per-client rate limit. Slow down the request rate or adjust the limi
 ### `400 Bad Request`
 
 The request body or query parameters failed validation. Check the response error message for the specific field and constraint.
-
-## Notes for Evaluators
-
-- Docker Compose runs the API in `Production`, so Swagger is not exposed there.
-- If you want Swagger locally, run the API directly in Development with `dotnet run --project FraudEngine.API`.
-- The checked-in database, Redis, and API credentials are demo-only and exist purely to make local evaluation easy.
