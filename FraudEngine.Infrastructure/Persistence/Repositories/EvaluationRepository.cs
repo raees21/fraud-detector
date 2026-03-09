@@ -64,4 +64,13 @@ internal sealed class EvaluationRepository : IEvaluationRepository
                 evaluation.Transaction.AccountId == accountId)
             .CountAsync(cancellationToken);
     }
+
+    /// <inheritdoc />
+    public async Task<FraudEvaluation?> GetByTransactionIdAsync(Guid transactionId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.FraudEvaluations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(evaluation => evaluation.TransactionId == transactionId, cancellationToken);
+    }
 }

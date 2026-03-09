@@ -1,17 +1,27 @@
 # Fraud Detector
 
-Fraud Detector is a machine-to-machine fraud evaluation API. It accepts transaction data from partner systems such as payment processors or banks, evaluates the request against seeded fraud rules, stores the transaction and evaluation result, and exposes a small set of authenticated read APIs for operations and audit workflows.
+Fraud Detector is a machine-to-machine fraud evaluation API built around an event-driven flow. It accepts transaction submissions from partner systems such as payment processors or banks, persists them durably, publishes them to Kafka, evaluates them asynchronously against seeded fraud rules, stores the resulting fraud decision, and exposes authenticated read APIs for polling and audit workflows.
 
-The project is built with ASP.NET Core, PostgreSQL, Redis, MediatR, and [Microsoft RulesEngine](https://github.com/microsoft/RulesEngine) for configurable fraud rule execution. For local evaluation, the fastest path is Docker Compose.
+The project is built with ASP.NET Core, PostgreSQL, Redis, Kafka, MediatR, and [Microsoft RulesEngine](https://github.com/microsoft/RulesEngine) for configurable fraud rule execution. For local evaluation, the fastest path is Docker Compose.
 
 ## What This Project Does
 
-- Accepts a transaction payload and evaluates it for fraud.
-- Returns a fraud decision immediately: `ALLOW`, `REVIEW`, or `BLOCK`.
+- Accepts a transaction payload and returns an asynchronous submission receipt.
+- Publishes submitted transactions to Kafka through a durable outbox.
+- Evaluates fraud asynchronously in a background consumer.
+- Exposes a polling endpoint to retrieve the final fraud decision: `ALLOW`, `REVIEW`, or `BLOCK`.
 - Stores transaction history and evaluation history in PostgreSQL.
 - Uses Redis for short-window velocity checks.
 - Protects partner-facing endpoints with API key authentication.
 - Applies rate limiting per authenticated client.
+
+## Event-Driven Flow
+
+1. `POST /api/v1/transactions` validates the request and stores the transaction with status `PENDING`.
+2. The API writes a `TransactionSubmitted` integration event to the outbox in the same database transaction.
+3. A background publisher sends outbox events to Kafka.
+4. A background consumer reads the submitted transaction event, evaluates fraud rules, stores the evaluation, and marks the transaction `COMPLETED` or `FAILED`.
+5. Clients poll `GET /api/v1/transactions/{transactionId}` for status and final decision details.
 
 ## Security Features
 
@@ -23,15 +33,16 @@ The project is built with ASP.NET Core, PostgreSQL, Redis, MediatR, and [Microso
 
 ## Performance
 
-- Fast synchronous evaluation path: fraud decisions are returned in the request/response cycle without background job dependencies.
+- Fast submission path: transaction ingestion returns immediately with `202 Accepted` instead of waiting for rule evaluation to finish inline.
+- Asynchronous decoupling: Kafka separates API write latency from fraud-processing latency.
 - Redis-backed velocity checks: short-window transaction counts are stored in Redis instead of recalculating them from PostgreSQL on every request.
 - Database-backed history with bounded reads: transaction and evaluation history endpoints are paginated by default with `page=1` and `pageSize=20`, and `pageSize` is capped.
-- Lightweight response models: write endpoints return a compact decision payload instead of full entity graphs.
 - Burst handling: token-bucket rate limiting absorbs short bursts while preventing unbounded abuse against the API.
 
 ## Scalability
 
 - Stateless API layer: the API can be scaled horizontally because request processing does not rely on in-memory session state.
+- Decoupled processing: Kafka allows the ingestion rate and fraud-processing rate to scale independently.
 - Separated infrastructure concerns: PostgreSQL handles durable transaction/evaluation storage, while Redis handles high-frequency short-window checks.
 - Rules are data-driven: Microsoft RulesEngine workflows are loaded from stored rule definitions, so rule updates do not require code changes for every fraud adjustment.
 - Containerized deployment: the service can be run locally with Docker Compose and moved to a container platform with the same runtime model.
@@ -97,6 +108,7 @@ This starts:
 - `api` on `http://localhost:5050`
 - `postgres` inside Docker
 - `redis` inside Docker
+- `kafka` inside Docker
 
 Container hardening in the default Docker setup:
 
@@ -165,7 +177,7 @@ GET /api/v1/health
 
 No auth required.
 
-### Evaluate a Transaction
+### Submit a Transaction
 
 ```http
 POST /api/v1/transactions
@@ -205,15 +217,14 @@ Example response:
 {
   "transactionId": "2f5de68a-879d-4268-ab30-cba1a7a4a353",
   "accountId": "ACC-10001",
-  "decision": "ALLOW",
-  "triggeredRules": [
-    "TRANSACTION_TYPE_CARD_RULE"
-  ],
-  "evaluatedAt": "2026-03-08T12:00:00.1234567+00:00"
+  "status": "PENDING",
+  "submittedAt": "2026-03-08T12:00:00.1234567+00:00"
 }
 ```
 
-Example request body that triggers multiple rules:
+This endpoint does not return the final fraud decision. Poll `GET /api/v1/transactions/{transactionId}` until the status becomes `COMPLETED` or `FAILED`.
+
+Example request body that will later trigger multiple rules:
 
 ```json
 {
@@ -230,19 +241,47 @@ Example request body that triggers multiple rules:
 }
 ```
 
-Expected response:
+Expected immediate response:
 
 ```json
 {
   "transactionId": "caf96dc8-901a-4415-9cc9-caac49fd9dc0",
   "accountId": "ACC-10001",
+  "status": "PENDING",
+  "submittedAt": "2026-03-08T23:42:31.5653485+00:00"
+}
+```
+
+### Get a Transaction by ID
+
+```http
+GET /api/v1/transactions/{transactionId}
+X-Client-Id: fraud-ops
+X-Api-Key: fraud-ops-dev-local-2026
+```
+
+Example completed response:
+
+```json
+{
+  "transactionId": "caf96dc8-901a-4415-9cc9-caac49fd9dc0",
+  "accountId": "ACC-10001",
+  "amount": 15000,
+  "currency": "ZAR",
+  "merchantName": "Contoso",
+  "merchantCategory": "CRYPTO",
+  "transactionType": "CARD",
+  "status": "COMPLETED",
   "decision": "BLOCK",
   "triggeredRules": [
     "TRANSACTION_TYPE_CARD_RULE",
     "HIGH_RISK_MERCHANT_RULE",
     "HIGH_AMOUNT_RULE"
   ],
-  "evaluatedAt": "2026-03-08T23:42:31.5653485+00:00"
+  "timestamp": "2026-03-08T12:00:00+00:00",
+  "createdAt": "2026-03-08T23:42:31.1200000+00:00",
+  "evaluatedAt": "2026-03-08T23:42:31.5653485+00:00",
+  "failureReason": null
 }
 ```
 
@@ -289,6 +328,7 @@ Example response:
       "merchantName": "Contoso",
       "merchantCategory": "RETAIL",
       "transactionType": "CARD",
+      "status": "COMPLETED",
       "timestamp": "2026-03-08T12:00:00+00:00",
       "createdAt": "2026-03-08T12:00:00.1000000+00:00"
     }
@@ -297,14 +337,6 @@ Example response:
   "page": 1,
   "pageSize": 20
 }
-```
-
-### Get a Transaction by ID
-
-```http
-GET /api/v1/transactions/{transactionId}
-X-Client-Id: fraud-ops
-X-Api-Key: fraud-ops-dev-local-2026
 ```
 
 ### Get Evaluation History
@@ -391,7 +423,7 @@ Example response:
 
 ## Copy/Paste Curl Examples
 
-### Evaluate a transaction
+### Submit a transaction
 
 ```sh
 curl -X POST http://localhost:5050/api/v1/transactions \
@@ -410,6 +442,14 @@ curl -X POST http://localhost:5050/api/v1/transactions \
     "accountAgeDays": 365,
     "timestamp": "2026-03-08T12:00:00Z"
   }'
+```
+
+### Poll transaction status
+
+```sh
+curl http://localhost:5050/api/v1/transactions/{transactionId} \
+  -H "X-Client-Id: fraud-ops" \
+  -H "X-Api-Key: fraud-ops-dev-local-2026"
 ```
 
 ### Read rules
@@ -467,9 +507,9 @@ If the limit is exceeded, the API returns `429 Too Many Requests`.
 
 ```text
 FraudEngine.API              HTTP API, auth, middleware, controllers
-FraudEngine.Application      use cases, DTOs, MediatR handlers, validation
+FraudEngine.Application      use cases, DTOs, MediatR handlers, validation, event contracts
 FraudEngine.Domain           core entities and result types
-FraudEngine.Infrastructure   EF Core, Redis, rules engine, persistence
+FraudEngine.Infrastructure   EF Core, Redis, Kafka, rules engine, persistence
 FraudEngine.UnitTests        unit tests
 FraudEngine.IntegrationTests integration test scaffolding
 ```
@@ -511,4 +551,4 @@ The request body or query parameters failed validation. Check the response error
 
 - Docker Compose runs the API in `Production`, so Swagger is not exposed there.
 - If you want Swagger locally, run the API directly in Development with `dotnet run --project FraudEngine.API`.
-- The checked-in database, Redis, and API credentials are demo-only and exist purely to make local evaluation easy.
+- The checked-in database, Redis, Kafka, and API credentials are demo-only and exist purely to make local evaluation easy.

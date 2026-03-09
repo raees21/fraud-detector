@@ -28,22 +28,23 @@ public class TransactionsController : ApiControllerBase
     }
 
     /// <summary>
-    /// Evaluates a new transaction against the active fraud rules.
+    /// Accepts a new transaction for asynchronous fraud evaluation.
     /// </summary>
     /// <param name="dto">The transaction details.</param>
-    /// <returns>The evaluation result with the final decision.</returns>
+    /// <returns>A submission receipt with the transaction identifier and pending status.</returns>
     [HttpPost]
     [Authorize(Policy = ApiAuthorizationPolicies.SubmitTransactions)]
     [EnableRateLimiting("transaction-submissions")]
     [RequestSizeLimit(16 * 1024)]
-    public async Task<IActionResult> EvaluateTransaction([FromBody] TransactionDto dto)
+    public async Task<IActionResult> SubmitTransaction([FromBody] TransactionDto dto)
     {
-        var command = new EvaluateTransactionCommand(dto);
-        Result<FraudEvaluationResultDto> result = await _mediator.Send(command);
+        var command = new SubmitTransactionCommand(dto);
+        Result<TransactionSubmissionAcceptedDto> result = await _mediator.Send(command);
 
         if (result.IsFailure) return BadRequest(new { Error = result.Error.Code, result.Error.Message });
 
-        return Ok(result.Value);
+        return AcceptedAtAction(nameof(GetTransactionById), new { version = "1.0", id = result.Value.TransactionId },
+            result.Value);
     }
 
     /// <summary>
@@ -91,12 +92,12 @@ public class TransactionsController : ApiControllerBase
     public async Task<IActionResult> GetTransactionById(Guid id)
     {
         var query = new GetTransactionByIdQuery(id);
-        Result<Transaction> result = await _mediator.Send(query);
+        Result<TransactionStatusDto> result = await _mediator.Send(query);
 
         if (result.IsFailure)
             return NotFound(new { Error = result.Error.Code, result.Error.Message });
 
-        return Ok(MapTransaction(result.Value));
+        return Ok(result.Value);
     }
 
     private static TransactionSummaryDto MapTransaction(Transaction transaction)
@@ -109,6 +110,7 @@ public class TransactionsController : ApiControllerBase
             transaction.MerchantName,
             transaction.MerchantCategory,
             transaction.TransactionType,
+            transaction.ProcessingStatus.ToString(),
             transaction.Timestamp,
             transaction.CreatedAt
         );

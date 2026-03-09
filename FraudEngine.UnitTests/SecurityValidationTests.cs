@@ -10,10 +10,10 @@ namespace FraudEngine.UnitTests;
 public class SecurityValidationTests
 {
     [Fact]
-    public void EvaluateTransactionCommand_InvalidIpAddress_IsRejected()
+    public void SubmitTransactionCommand_InvalidIpAddress_IsRejected()
     {
-        var validator = new EvaluateTransactionCommandValidator();
-        var command = new EvaluateTransactionCommand(new TransactionDto(
+        var validator = new SubmitTransactionCommandValidator();
+        var command = new SubmitTransactionCommand(new TransactionDto(
             "ACC-10001",
             25.50m,
             "USD",
@@ -32,10 +32,10 @@ public class SecurityValidationTests
     }
 
     [Fact]
-    public void EvaluateTransactionCommand_MissingIpAddressAndDeviceId_IsRejected()
+    public void SubmitTransactionCommand_MissingIpAddressAndDeviceId_IsRejected()
     {
-        var validator = new EvaluateTransactionCommandValidator();
-        var command = new EvaluateTransactionCommand(new TransactionDto(
+        var validator = new SubmitTransactionCommandValidator();
+        var command = new SubmitTransactionCommand(new TransactionDto(
             "ACC-10001",
             25.50m,
             "USD",
@@ -55,10 +55,10 @@ public class SecurityValidationTests
     }
 
     [Fact]
-    public void EvaluateTransactionCommand_UnknownTransactionType_IsRejected()
+    public void SubmitTransactionCommand_UnknownTransactionType_IsRejected()
     {
-        var validator = new EvaluateTransactionCommandValidator();
-        var command = new EvaluateTransactionCommand(new TransactionDto(
+        var validator = new SubmitTransactionCommandValidator();
+        var command = new SubmitTransactionCommand(new TransactionDto(
             "ACC-10001",
             25.50m,
             "USD",

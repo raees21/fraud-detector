@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using FraudEngine.Application.DTOs;
 using FraudEngine.Domain.Enums;
 
@@ -8,6 +9,11 @@ namespace FraudEngine.IntegrationTests;
 
 public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     private readonly ApiIntegrationFactory _factory;
 
     public TransactionScenarios(ApiIntegrationFactory factory)
@@ -41,7 +47,7 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
     }
 
     [Fact]
-    public async Task PostTransaction_WithRequiredTelemetry_ReturnsAllowAndIsQueryable()
+    public async Task PostTransaction_WithRequiredTelemetry_IsAcceptedAndCompletesAsAllow()
     {
         using HttpClient client = CreateAuthenticatedClient();
         string accountId = $"ACC-{Guid.NewGuid():N}";
@@ -61,13 +67,18 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
 
         HttpResponseMessage submitResponse = await client.PostAsJsonAsync("/api/v1/transactions", transaction);
 
-        Assert.Equal(HttpStatusCode.OK, submitResponse.StatusCode);
-        FraudEvaluationResultDto? evaluation = await submitResponse.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
-        Assert.NotNull(evaluation);
-        Assert.Equal("ALLOW", evaluation!.Decision);
-        Assert.NotEqual(Guid.Empty, evaluation.TransactionId);
-        Assert.Equal(accountId, evaluation.AccountId);
-        Assert.Contains("TRANSACTION_TYPE_EFT_RULE", evaluation.TriggeredRules);
+        Assert.Equal(HttpStatusCode.Accepted, submitResponse.StatusCode);
+        TransactionSubmissionAcceptedDto? accepted =
+            await submitResponse.Content.ReadFromJsonAsync<TransactionSubmissionAcceptedDto>();
+        Assert.NotNull(accepted);
+        Assert.Equal(accountId, accepted!.AccountId);
+        Assert.Equal("PENDING", accepted.Status);
+
+        TransactionStatusDto completed = await WaitForTerminalStatusAsync(client, accepted.TransactionId);
+
+        Assert.Equal("COMPLETED", completed.Status);
+        Assert.Equal("ALLOW", completed.Decision);
+        Assert.Contains("TRANSACTION_TYPE_EFT_RULE", completed.TriggeredRules);
 
         HttpResponseMessage historyResponse = await client.GetAsync(
             $"/api/v1/transactions?accountId={Uri.EscapeDataString(accountId)}");
@@ -79,8 +90,9 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
 
         JsonElement[] transactions = historyPayload.GetProperty("data").EnumerateArray().ToArray();
         JsonElement matchingTransaction = Assert.Single(transactions);
-        Assert.Equal(evaluation.TransactionId, matchingTransaction.GetProperty("transactionId").GetGuid());
+        Assert.Equal(accepted.TransactionId, matchingTransaction.GetProperty("transactionId").GetGuid());
         Assert.Equal("EFT", matchingTransaction.GetProperty("transactionType").GetString());
+        Assert.Equal("COMPLETED", matchingTransaction.GetProperty("status").GetString());
     }
 
     [Fact]
@@ -151,10 +163,12 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             DateTimeOffset.UtcNow);
 
         HttpResponseMessage submitResponse = await client.PostAsJsonAsync("/api/v1/transactions", transaction);
-        FraudEvaluationResultDto? evaluation = await submitResponse.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
+        TransactionSubmissionAcceptedDto? accepted =
+            await submitResponse.Content.ReadFromJsonAsync<TransactionSubmissionAcceptedDto>();
 
-        Assert.NotNull(evaluation);
-        Assert.Equal("ALLOW", evaluation!.Decision);
+        Assert.NotNull(accepted);
+        TransactionStatusDto completed = await WaitForTerminalStatusAsync(client, accepted!.TransactionId);
+        Assert.Equal("ALLOW", completed.Decision);
 
         HttpResponseMessage response = await client.GetAsync("/api/v1/evaluations?decision=ALLOW");
 
@@ -162,13 +176,13 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
         JsonElement payload = await ReadJsonAsync(response);
         bool containsTransaction = payload.GetProperty("data")
             .EnumerateArray()
-            .Any(item => item.GetProperty("transactionId").GetGuid() == evaluation.TransactionId);
+            .Any(item => item.GetProperty("transactionId").GetGuid() == accepted.TransactionId);
 
         Assert.True(containsTransaction);
     }
 
     [Fact]
-    public async Task PostTransaction_WhenRecentActivityIsFromDifferentCountry_ReturnsReview()
+    public async Task PostTransaction_WhenRecentActivityIsFromDifferentCountry_CompletesAsReview()
     {
         using HttpClient client = CreateAuthenticatedClient();
         string accountId = $"ACC-{Guid.NewGuid():N}";
@@ -198,19 +212,20 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
         HttpResponseMessage firstResponse = await client.PostAsJsonAsync("/api/v1/transactions", firstTransaction);
         HttpResponseMessage secondResponse = await client.PostAsJsonAsync("/api/v1/transactions", secondTransaction);
 
-        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, secondResponse.StatusCode);
 
-        FraudEvaluationResultDto? secondEvaluation =
-            await secondResponse.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
+        TransactionSubmissionAcceptedDto? secondAccepted =
+            await secondResponse.Content.ReadFromJsonAsync<TransactionSubmissionAcceptedDto>();
 
-        Assert.NotNull(secondEvaluation);
-        Assert.Equal("REVIEW", secondEvaluation!.Decision);
+        Assert.NotNull(secondAccepted);
+        TransactionStatusDto secondEvaluation = await WaitForTerminalStatusAsync(client, secondAccepted!.TransactionId);
+        Assert.Equal("REVIEW", secondEvaluation.Decision);
         Assert.Contains("RECENT_LOCATION_CHANGE_RULE", secondEvaluation.TriggeredRules);
     }
 
     [Fact]
-    public async Task PostTransaction_WhenThreeRecentBlockedAttemptsExist_ReturnsBlock()
+    public async Task PostTransaction_WhenThreeRecentBlockedAttemptsExist_CompletesAsBlock()
     {
         using HttpClient client = CreateAuthenticatedClient();
         string accountId = $"ACC-{Guid.NewGuid():N}";
@@ -231,12 +246,15 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
 
             HttpResponseMessage blockedResponse =
                 await client.PostAsJsonAsync("/api/v1/transactions", blockedAttempt);
-            FraudEvaluationResultDto? blockedEvaluation =
-                await blockedResponse.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
 
-            Assert.Equal(HttpStatusCode.OK, blockedResponse.StatusCode);
-            Assert.NotNull(blockedEvaluation);
-            Assert.Equal("BLOCK", blockedEvaluation!.Decision);
+            Assert.Equal(HttpStatusCode.Accepted, blockedResponse.StatusCode);
+            TransactionSubmissionAcceptedDto? blockedAccepted =
+                await blockedResponse.Content.ReadFromJsonAsync<TransactionSubmissionAcceptedDto>();
+            Assert.NotNull(blockedAccepted);
+
+            TransactionStatusDto blockedEvaluation =
+                await WaitForTerminalStatusAsync(client, blockedAccepted!.TransactionId);
+            Assert.Equal("BLOCK", blockedEvaluation.Decision);
         }
 
         var followUpTransaction = new TransactionDto(
@@ -252,11 +270,14 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
             DateTimeOffset.UtcNow);
 
         HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/transactions", followUpTransaction);
-        FraudEvaluationResultDto? evaluation = await response.Content.ReadFromJsonAsync<FraudEvaluationResultDto>();
+        TransactionSubmissionAcceptedDto? accepted =
+            await response.Content.ReadFromJsonAsync<TransactionSubmissionAcceptedDto>();
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.NotNull(evaluation);
-        Assert.Equal("BLOCK", evaluation!.Decision);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.NotNull(accepted);
+
+        TransactionStatusDto evaluation = await WaitForTerminalStatusAsync(client, accepted!.TransactionId);
+        Assert.Equal("BLOCK", evaluation.Decision);
         Assert.Contains("REPEATED_DECLINED_TRANSACTION_RULE", evaluation.TriggeredRules);
     }
 
@@ -291,5 +312,25 @@ public sealed class TransactionScenarios : IClassFixture<ApiIntegrationFactory>
     {
         JsonElement payload = await response.Content.ReadFromJsonAsync<JsonElement>();
         return payload;
+    }
+
+    private static async Task<TransactionStatusDto> WaitForTerminalStatusAsync(HttpClient client, Guid transactionId)
+    {
+        for (int attempt = 0; attempt < 50; attempt++)
+        {
+            HttpResponseMessage response = await client.GetAsync($"/api/v1/transactions/{transactionId}");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            TransactionStatusDto? transaction =
+                await response.Content.ReadFromJsonAsync<TransactionStatusDto>(JsonOptions);
+            Assert.NotNull(transaction);
+
+            if (transaction!.Status is "COMPLETED" or "FAILED")
+                return transaction;
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Transaction {transactionId} did not reach a terminal status in time.");
     }
 }

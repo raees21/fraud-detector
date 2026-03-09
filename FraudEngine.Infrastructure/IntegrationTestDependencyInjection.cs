@@ -1,10 +1,14 @@
+using System.Text.Json;
+using System.Threading.Channels;
 using FraudEngine.Application.Interfaces;
+using FraudEngine.Application.IntegrationEvents;
 using FraudEngine.Domain.Entities;
 using FraudEngine.Domain.Enums;
 using FraudEngine.Infrastructure.Data;
 using FraudEngine.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 
 namespace FraudEngine.Infrastructure;
 
@@ -13,6 +17,16 @@ public static class IntegrationTestDependencyInjection
     public static IServiceCollection AddIntegrationTestInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<InMemoryFraudStore>();
+        services.AddOptions<KafkaOptions>()
+            .Configure(options =>
+            {
+                options.BootstrapServers = "in-memory";
+                options.ConsumerGroupId = "integration-tests";
+                options.TransactionSubmittedTopic = "fraud.transactions.submitted";
+                options.TransactionEvaluatedTopic = "fraud.transactions.evaluated";
+                options.OutboxBatchSize = 20;
+                options.IdleDelayMs = 50;
+            });
         services.AddOptions<ConfiguredIpLocationService.IpLocationOptions>()
             .Configure(options =>
             {
@@ -62,9 +76,18 @@ public static class IntegrationTestDependencyInjection
         services.AddScoped<ITransactionRepository, InMemoryTransactionRepository>();
         services.AddScoped<IEvaluationRepository, InMemoryEvaluationRepository>();
         services.AddScoped<IRuleRepository, InMemoryRuleRepository>();
+        services.AddScoped<IOutboxRepository, InMemoryOutboxRepository>();
+        services.AddScoped<ITransactionWorkflowRepository, InMemoryTransactionWorkflowRepository>();
         services.AddScoped<IVelocityService, InMemoryVelocityService>();
         services.AddSingleton<IIpLocationService, ConfiguredIpLocationService>();
         services.AddScoped<IRulesEngineService, RulesEngineService>();
+        services.AddScoped<ITransactionEventProcessor, TransactionEventProcessor>();
+        services.AddSingleton<IIntegrationEventTopicProvider, KafkaTopicProvider>();
+        services.AddSingleton<IIntegrationEventProducer, InMemoryIntegrationEventProducer>();
+        services.AddSingleton<ITransactionSubmittedEventSubscriber, InMemoryTransactionSubmittedEventSubscriber>();
+
+        services.AddHostedService<OutboxPublisherHostedService>();
+        services.AddHostedService<TransactionSubmittedConsumerHostedService>();
 
         services.AddHealthChecks()
             .AddCheck("in-memory", () => HealthCheckResult.Healthy());
@@ -90,8 +113,17 @@ public static class IntegrationTestDependencyInjection
 
         public List<RuleDefinition> Rules { get; }
 
+        public List<OutboxMessage> OutboxMessages { get; } = new();
+
+        public List<ProcessedIntegrationEvent> ProcessedIntegrationEvents { get; } = new();
+
+        public Channel<PublishedIntegrationEvent> SubmittedEvents { get; } =
+            Channel.CreateUnbounded<PublishedIntegrationEvent>();
+
         public Dictionary<string, Queue<DateTimeOffset>> VelocityWindows => _velocityWindows;
     }
+
+    private sealed record PublishedIntegrationEvent(Guid EventId, string Topic, string Key, string Payload);
 
     private sealed class InMemoryTransactionRepository : ITransactionRepository
     {
@@ -259,6 +291,16 @@ public static class IntegrationTestDependencyInjection
                 return Task.FromResult(count);
             }
         }
+
+        public Task<FraudEvaluation?> GetByTransactionIdAsync(Guid transactionId,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_store.SyncRoot)
+            {
+                return Task.FromResult(_store.Evaluations.FirstOrDefault(
+                    evaluation => evaluation.TransactionId == transactionId));
+            }
+        }
     }
 
     private sealed class InMemoryRuleRepository : IRuleRepository
@@ -342,6 +384,214 @@ public static class IntegrationTestDependencyInjection
 
                 timestamps.Enqueue(now);
                 return Task.FromResult(timestamps.Count);
+            }
+        }
+    }
+
+    private sealed class InMemoryOutboxRepository : IOutboxRepository
+    {
+        private readonly InMemoryFraudStore _store;
+
+        public InMemoryOutboxRepository(InMemoryFraudStore store)
+        {
+            _store = store;
+        }
+
+        public Task<IReadOnlyList<OutboxMessage>> GetPendingAsync(int batchSize,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_store.SyncRoot)
+            {
+                IReadOnlyList<OutboxMessage> messages = _store.OutboxMessages
+                    .Where(message =>
+                        message.Status == OutboxMessageStatus.PENDING || message.Status == OutboxMessageStatus.FAILED)
+                    .OrderBy(message => message.CreatedAt)
+                    .Take(batchSize)
+                    .Select(message => message)
+                    .ToList();
+
+                return Task.FromResult(messages);
+            }
+        }
+
+        public Task MarkPublishedAsync(Guid outboxMessageId, DateTimeOffset publishedAt,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_store.SyncRoot)
+            {
+                OutboxMessage? message = _store.OutboxMessages.FirstOrDefault(item => item.Id == outboxMessageId);
+                if (message is not null)
+                {
+                    message.Status = OutboxMessageStatus.PUBLISHED;
+                    message.PublishedAt = publishedAt;
+                    message.LastError = null;
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task MarkFailedAsync(Guid outboxMessageId, string error, CancellationToken cancellationToken = default)
+        {
+            lock (_store.SyncRoot)
+            {
+                OutboxMessage? message = _store.OutboxMessages.FirstOrDefault(item => item.Id == outboxMessageId);
+                if (message is not null)
+                {
+                    message.Status = OutboxMessageStatus.FAILED;
+                    message.Attempts += 1;
+                    message.LastError = error;
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class InMemoryTransactionWorkflowRepository : ITransactionWorkflowRepository
+    {
+        private readonly InMemoryFraudStore _store;
+
+        public InMemoryTransactionWorkflowRepository(InMemoryFraudStore store)
+        {
+            _store = store;
+        }
+
+        public Task SubmitAsync(Transaction transaction, OutboxMessage outboxMessage,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_store.SyncRoot)
+            {
+                _store.Transactions.Add(transaction);
+                _store.OutboxMessages.Add(outboxMessage);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> TryBeginProcessingAsync(Guid transactionId, Guid eventId, string topic,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_store.SyncRoot)
+            {
+                if (_store.ProcessedIntegrationEvents.Any(item => item.EventId == eventId))
+                    return Task.FromResult(false);
+
+                Transaction? transaction = _store.Transactions.FirstOrDefault(item => item.Id == transactionId);
+                if (transaction is null || transaction.ProcessingStatus != TransactionProcessingStatus.PENDING)
+                {
+                    _store.ProcessedIntegrationEvents.Add(new ProcessedIntegrationEvent
+                    {
+                        EventId = eventId,
+                        Topic = topic
+                    });
+                    return Task.FromResult(false);
+                }
+
+                transaction.ProcessingStatus = TransactionProcessingStatus.PROCESSING;
+                transaction.FailureReason = null;
+                return Task.FromResult(true);
+            }
+        }
+
+        public Task CompleteProcessingAsync(Guid transactionId, FraudEvaluation evaluation, OutboxMessage outboxMessage,
+            Guid eventId, string topic, CancellationToken cancellationToken = default)
+        {
+            lock (_store.SyncRoot)
+            {
+                Transaction transaction = _store.Transactions.First(item => item.Id == transactionId);
+                transaction.ProcessingStatus = TransactionProcessingStatus.COMPLETED;
+                transaction.FailureReason = null;
+                _store.Evaluations.Add(evaluation);
+                _store.OutboxMessages.Add(outboxMessage);
+                _store.ProcessedIntegrationEvents.Add(new ProcessedIntegrationEvent
+                {
+                    EventId = eventId,
+                    Topic = topic
+                });
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task FailProcessingAsync(Guid transactionId, string failureReason, Guid eventId, string topic,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_store.SyncRoot)
+            {
+                Transaction? transaction = _store.Transactions.FirstOrDefault(item => item.Id == transactionId);
+                if (transaction is not null)
+                {
+                    transaction.ProcessingStatus = TransactionProcessingStatus.FAILED;
+                    transaction.FailureReason = failureReason;
+                }
+
+                if (_store.ProcessedIntegrationEvents.All(item => item.EventId != eventId))
+                {
+                    _store.ProcessedIntegrationEvents.Add(new ProcessedIntegrationEvent
+                    {
+                        EventId = eventId,
+                        Topic = topic
+                    });
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class InMemoryIntegrationEventProducer : IIntegrationEventProducer
+    {
+        private readonly KafkaOptions _options;
+        private readonly InMemoryFraudStore _store;
+
+        public InMemoryIntegrationEventProducer(
+            InMemoryFraudStore store,
+            IOptions<KafkaOptions> options)
+        {
+            _store = store;
+            _options = options.Value;
+        }
+
+        public Task PublishAsync(string topic, string key, string payload, CancellationToken cancellationToken = default)
+        {
+            if (!string.Equals(topic, _options.TransactionSubmittedTopic, StringComparison.Ordinal))
+                return Task.CompletedTask;
+
+            TransactionSubmittedIntegrationEvent? integrationEvent =
+                JsonSerializer.Deserialize<TransactionSubmittedIntegrationEvent>(payload);
+            if (integrationEvent is null)
+                return Task.CompletedTask;
+
+            return _store.SubmittedEvents.Writer.WriteAsync(new PublishedIntegrationEvent(
+                integrationEvent.EventId,
+                topic,
+                key,
+                payload), cancellationToken).AsTask();
+        }
+    }
+
+    private sealed class InMemoryTransactionSubmittedEventSubscriber : ITransactionSubmittedEventSubscriber
+    {
+        private readonly InMemoryFraudStore _store;
+
+        public InMemoryTransactionSubmittedEventSubscriber(InMemoryFraudStore store)
+        {
+            _store = store;
+        }
+
+        public async IAsyncEnumerable<ReceivedIntegrationEvent> ReadAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await foreach (PublishedIntegrationEvent integrationEvent in
+                           _store.SubmittedEvents.Reader.ReadAllAsync(cancellationToken))
+            {
+                yield return new ReceivedIntegrationEvent(
+                    integrationEvent.EventId,
+                    integrationEvent.Topic,
+                    integrationEvent.Key,
+                    integrationEvent.Payload,
+                    _ => Task.CompletedTask);
             }
         }
     }

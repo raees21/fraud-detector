@@ -8,11 +8,11 @@ using FraudEngine.Domain.Enums;
 namespace FraudEngine.Application.Validation;
 
 /// <summary>
-/// Validates incoming transaction evaluation requests before they reach persistence or rule execution.
+/// Validates incoming transaction submission requests before they reach persistence or background processing.
 /// </summary>
-internal sealed class EvaluateTransactionCommandValidator : AbstractValidator<EvaluateTransactionCommand>
+internal sealed class SubmitTransactionCommandValidator : AbstractValidator<SubmitTransactionCommand>
 {
-    public EvaluateTransactionCommandValidator()
+    public SubmitTransactionCommandValidator()
     {
         RuleFor(command => command.Transaction.AccountId)
             .NotEmpty()

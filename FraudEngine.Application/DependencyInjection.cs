@@ -1,8 +1,8 @@
 using FluentValidation;
 using FraudEngine.Application.Behaviors;
 using FraudEngine.Application.Features.Evaluations.Queries;
-using FraudEngine.Application.Features.Transactions.Commands;
 using FraudEngine.Application.Features.Transactions.Queries;
+using FraudEngine.Application.Features.Transactions.Commands;
 using FraudEngine.Application.Validation;
 using System.Reflection;
 using MediatR;
@@ -25,7 +25,7 @@ public static class DependencyInjection
         services.AddMediatR(configuration => { configuration.RegisterServicesFromAssembly(assembly); });
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
-        services.AddScoped<IValidator<EvaluateTransactionCommand>, EvaluateTransactionCommandValidator>();
+        services.AddScoped<IValidator<SubmitTransactionCommand>, SubmitTransactionCommandValidator>();
         services.AddScoped<IValidator<GetTransactionsQuery>, GetTransactionsQueryValidator>();
         services.AddScoped<IValidator<GetEvaluationsQuery>, GetEvaluationsQueryValidator>();
 

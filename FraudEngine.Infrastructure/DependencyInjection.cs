@@ -30,16 +30,29 @@ public static class DependencyInjection
         services.AddSingleton<IOptions<ConfiguredIpLocationService.IpLocationOptions>>(
             Options.Create(ipLocationOptions));
 
+        KafkaOptions kafkaOptions = BuildKafkaOptions(configuration.GetSection("Kafka"));
+        services.AddSingleton<IOptions<KafkaOptions>>(Options.Create(kafkaOptions));
+
         var multiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
         services.AddSingleton<IConnectionMultiplexer>(multiplexer);
 
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IEvaluationRepository, EvaluationRepository>();
         services.AddScoped<IRuleRepository, RuleRepository>();
+        services.AddScoped<IOutboxRepository, OutboxRepository>();
+        services.AddScoped<ITransactionWorkflowRepository, TransactionWorkflowRepository>();
 
         services.AddScoped<IVelocityService, VelocityService>();
         services.AddSingleton<IIpLocationService, ConfiguredIpLocationService>();
         services.AddScoped<IRulesEngineService, RulesEngineService>();
+        services.AddScoped<ITransactionEventProcessor, TransactionEventProcessor>();
+
+        services.AddSingleton<IIntegrationEventTopicProvider, KafkaTopicProvider>();
+        services.AddSingleton<IIntegrationEventProducer, KafkaIntegrationEventProducer>();
+        services.AddSingleton<ITransactionSubmittedEventSubscriber, KafkaTransactionSubmittedEventSubscriber>();
+
+        services.AddHostedService<OutboxPublisherHostedService>();
+        services.AddHostedService<TransactionSubmittedConsumerHostedService>();
 
         services.AddHealthChecks()
             .AddDbContextCheck<AppDbContext>()
@@ -64,5 +77,30 @@ public static class DependencyInjection
         }
 
         return options;
+    }
+
+    private static KafkaOptions BuildKafkaOptions(IConfigurationSection section)
+    {
+        string? bootstrapServers = section["BootstrapServers"];
+        string? consumerGroupId = section["ConsumerGroupId"];
+        string? transactionSubmittedTopic = section["TransactionSubmittedTopic"];
+        string? transactionEvaluatedTopic = section["TransactionEvaluatedTopic"];
+
+        if (string.IsNullOrWhiteSpace(bootstrapServers) ||
+            string.IsNullOrWhiteSpace(consumerGroupId) ||
+            string.IsNullOrWhiteSpace(transactionSubmittedTopic) ||
+            string.IsNullOrWhiteSpace(transactionEvaluatedTopic))
+            throw new InvalidOperationException(
+                "Kafka bootstrap servers, topics, and consumer group ID are required.");
+
+        return new KafkaOptions
+        {
+            BootstrapServers = bootstrapServers,
+            ConsumerGroupId = consumerGroupId,
+            TransactionSubmittedTopic = transactionSubmittedTopic,
+            TransactionEvaluatedTopic = transactionEvaluatedTopic,
+            OutboxBatchSize = int.TryParse(section["OutboxBatchSize"], out int batchSize) ? batchSize : 20,
+            IdleDelayMs = int.TryParse(section["IdleDelayMs"], out int idleDelayMs) ? idleDelayMs : 500
+        };
     }
 }

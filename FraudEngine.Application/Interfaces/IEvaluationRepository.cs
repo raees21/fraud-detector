@@ -37,4 +37,10 @@ public interface IEvaluationRepository
     /// <returns>The number of blocked evaluations for the account since the provided time.</returns>
     public Task<int> CountRecentBlockedAttemptsAsync(string accountId, DateTimeOffset since,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves the evaluation for a specific transaction if one exists.
+    /// </summary>
+    public Task<FraudEvaluation?> GetByTransactionIdAsync(Guid transactionId,
+        CancellationToken cancellationToken = default);
 }

@@ -20,14 +20,13 @@ public record TransactionDto(
 );
 
 /// <summary>
-/// Data transfer object representing the result of a fraud evaluation.
+/// Data transfer object representing an accepted asynchronous transaction submission.
 /// </summary>
-public record FraudEvaluationResultDto(
+public record TransactionSubmissionAcceptedDto(
     Guid TransactionId,
     string AccountId,
-    string Decision,
-    IReadOnlyList<string> TriggeredRules,
-    DateTimeOffset EvaluatedAt
+    string Status,
+    DateTimeOffset SubmittedAt
 );
 
 /// <summary>
@@ -41,8 +40,29 @@ public record TransactionSummaryDto(
     string MerchantName,
     string MerchantCategory,
     TransactionType TransactionType,
+    string Status,
     DateTimeOffset Timestamp,
     DateTimeOffset CreatedAt
+);
+
+/// <summary>
+/// A detailed transaction status view used for polling asynchronous fraud evaluation.
+/// </summary>
+public record TransactionStatusDto(
+    Guid TransactionId,
+    string AccountId,
+    decimal Amount,
+    string Currency,
+    string MerchantName,
+    string MerchantCategory,
+    TransactionType TransactionType,
+    string Status,
+    string? Decision,
+    IReadOnlyList<string> TriggeredRules,
+    DateTimeOffset Timestamp,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? EvaluatedAt,
+    string? FailureReason
 );
 
 /// <summary>

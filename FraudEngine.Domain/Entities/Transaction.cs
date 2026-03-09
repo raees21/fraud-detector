@@ -10,6 +10,7 @@ namespace FraudEngine.Domain.Entities;
 /// </summary>
 [Index(nameof(AccountId))]
 [Index(nameof(Timestamp))]
+[Index(nameof(ProcessingStatus))]
 public class Transaction
 {
     /// <summary>
@@ -56,6 +57,18 @@ public class Transaction
     /// Gets or sets the type of transaction being evaluated.
     /// </summary>
     public TransactionType TransactionType { get; set; } = TransactionType.UNKNOWN;
+
+    /// <summary>
+    /// Gets or sets the asynchronous fraud-processing status for the transaction.
+    /// </summary>
+    [Required]
+    public TransactionProcessingStatus ProcessingStatus { get; set; } = TransactionProcessingStatus.PENDING;
+
+    /// <summary>
+    /// Gets or sets the latest processing failure reason, if any.
+    /// </summary>
+    [MaxLength(1000)]
+    public string? FailureReason { get; set; }
 
     /// <summary>
     /// Gets or sets the IP address from which the transaction was initiated.
